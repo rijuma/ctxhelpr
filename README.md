@@ -63,30 +63,40 @@ cargo build --release
 ### Setup
 
 ```bash
-ctxhelpr setup
+ctxhelpr setup [-l | -g]
 ```
 
-That single command:
-
-- Registers the MCP server with Claude Code
-- Installs a skill file so Claude knows when and how to use it
-- Installs a `/index` slash command for manual indexing
+Registers the MCP server, installs the skill file and `/index` command, prompts to grant tool permissions, and prints the database path. Use `-l` / `--local` for the project's `.claude/` directory, or `-g` / `--global` for `~/.claude/`. If neither is specified, you'll be prompted to choose.
 
 ### Uninstall
 
 ```bash
-ctxhelpr uninstall
+ctxhelpr uninstall [-l | -g]
 ```
 
-Removes all integrations cleanly.
+Removes all integrations and revokes tool permissions.
+
+### Permissions
+
+```bash
+ctxhelpr perms [-l | -g] [-a | -r]
+```
+
+Manages which ctxhelpr tools Claude Code can call without prompting. Without flags, opens an interactive checklist. `-a` / `--all` grants all permissions; `-r` / `--remove` revokes them. During setup you'll be asked to grant all; use `ctxhelpr perms` to change them later.
 
 ### CLI
 
 ```bash
-ctxhelpr serve       # Start MCP server (called by Claude Code via stdio)
-ctxhelpr setup       # One-time setup
-ctxhelpr uninstall   # Remove everything
+ctxhelpr                                    # Show help
+ctxhelpr serve                              # MCP server (used internally by Claude Code)
+ctxhelpr setup [-l | -g]                    # Set up integration
+ctxhelpr uninstall [-l | -g]                # Remove integration
+ctxhelpr perms [-l | -g] [-a | -r]          # Manage permissions
 ```
+
+`serve` is not meant to be run manually. Claude Code spawns it via stdio; it stops automatically when the session ends.
+
+When neither `-l` nor `-g` is specified: `setup` prompts you to choose; other commands auto-detect by checking for a local `.claude/settings.json` first, falling back to global.
 
 ## Configuration
 
@@ -125,7 +135,7 @@ All of this happens automatically through the skill file - you don't need to do 
 ```text
 src/
 ├── main.rs                 # CLI entry point
-├── cli/                    # setup & uninstall commands
+├── cli/                    # setup, uninstall, perms & permissions
 ├── server/                 # MCP server (stdio transport)
 ├── mcp/                    # Tool definitions and handlers
 ├── indexer/                # Core indexing logic + language extractors
