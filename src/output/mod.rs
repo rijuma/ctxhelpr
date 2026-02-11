@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::storage::*;
 
@@ -112,52 +112,58 @@ impl CompactFormatter {
         }
 
         if !calls.is_empty() {
-            obj["calls"] = json!(calls
-                .iter()
-                .map(|r| {
-                    let mut v = json!({"n": r.to_name});
-                    if let Some(id) = r.to_symbol_id {
-                        v["id"] = json!(id);
-                    }
-                    v
-                })
-                .collect::<Vec<_>>());
+            obj["calls"] = json!(
+                calls
+                    .iter()
+                    .map(|r| {
+                        let mut v = json!({"n": r.to_name});
+                        if let Some(id) = r.to_symbol_id {
+                            v["id"] = json!(id);
+                        }
+                        v
+                    })
+                    .collect::<Vec<_>>()
+            );
         }
 
         if !called_by.is_empty() {
-            obj["called_by"] = json!(called_by
-                .iter()
-                .map(|r| {
-                    let mut v = json!({});
-                    v["from_id"] = json!(r.from_symbol_id);
-                    if let Some(n) = &r.from_name {
-                        v["from_n"] = json!(n);
-                    }
-                    if let Some(f) = &r.from_file {
-                        v["from_f"] = json!(f);
-                    }
-                    v["kind"] = json!(r.ref_kind);
-                    if let Some(l) = r.line {
-                        v["line"] = json!(l);
-                    }
-                    v
-                })
-                .collect::<Vec<_>>());
+            obj["called_by"] = json!(
+                called_by
+                    .iter()
+                    .map(|r| {
+                        let mut v = json!({});
+                        v["from_id"] = json!(r.from_symbol_id);
+                        if let Some(n) = &r.from_name {
+                            v["from_n"] = json!(n);
+                        }
+                        if let Some(f) = &r.from_file {
+                            v["from_f"] = json!(f);
+                        }
+                        v["kind"] = json!(r.ref_kind);
+                        if let Some(l) = r.line {
+                            v["line"] = json!(l);
+                        }
+                        v
+                    })
+                    .collect::<Vec<_>>()
+            );
         }
 
         if !type_refs.is_empty() {
-            obj["type_refs"] = json!(type_refs
-                .iter()
-                .map(|r| {
-                    let mut v = json!({"n": r.to_name});
-                    if let Some(id) = r.to_symbol_id {
-                        v["id"] = json!(id);
-                    } else {
-                        v["external"] = json!(true);
-                    }
-                    v
-                })
-                .collect::<Vec<_>>());
+            obj["type_refs"] = json!(
+                type_refs
+                    .iter()
+                    .map(|r| {
+                        let mut v = json!({"n": r.to_name});
+                        if let Some(id) = r.to_symbol_id {
+                            v["id"] = json!(id);
+                        } else {
+                            v["external"] = json!(true);
+                        }
+                        v
+                    })
+                    .collect::<Vec<_>>()
+            );
         }
 
         obj.to_string()

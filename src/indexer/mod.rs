@@ -384,10 +384,7 @@ fn process_file(
 
     let symbols = extractor.extract(&source, &tree);
 
-    let ext = full_path
-        .extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or("");
+    let ext = full_path.extension().and_then(|e| e.to_str()).unwrap_or("");
     let language = languages::detect_language(ext).unwrap_or("unknown");
     let file_id = storage.upsert_file(repo_id, rel_path, &hash, language)?;
     storage.clear_file_symbols(file_id)?;
