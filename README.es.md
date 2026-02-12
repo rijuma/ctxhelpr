@@ -63,30 +63,40 @@ cargo build --release
 ### Configuración inicial
 
 ```bash
-ctxhelpr setup
+ctxhelpr setup [-l | -g]
 ```
 
-Ese único comando:
-
-- Registra el servidor MCP con Claude Code
-- Instala un archivo de skill para que Claude sepa cuándo y cómo usarlo
-- Instala un comando `/index` para indexación manual
+Registra el servidor MCP, instala el archivo de skill y el comando `/index`, ofrece otorgar permisos a las herramientas, y muestra la ruta de la base de datos. Usá `-l` / `--local` para el directorio `.claude/` del proyecto, o `-g` / `--global` para `~/.claude/`. Si no se especifica ninguno, se te preguntará cuál elegir.
 
 ### Desinstalar
 
 ```bash
-ctxhelpr uninstall
+ctxhelpr uninstall [-l | -g]
 ```
 
-Elimina todas las integraciones limpiamente.
+Elimina todas las integraciones y revoca permisos de herramientas.
+
+### Permisos
+
+```bash
+ctxhelpr perms [-l | -g] [-a | -r]
+```
+
+Gestiona qué herramientas de ctxhelpr puede llamar Claude Code sin preguntar. Sin flags, abre un checklist interactivo. `-a` / `--all` otorga todos los permisos; `-r` / `--remove` los revoca. Durante setup se te preguntará si querés otorgar todos; usá `ctxhelpr perms` para cambiarlos después.
 
 ### CLI
 
 ```bash
-ctxhelpr serve       # Iniciar servidor MCP (llamado por Claude Code vía stdio)
-ctxhelpr setup       # Configuración inicial
-ctxhelpr uninstall   # Eliminar todo
+ctxhelpr                                    # Mostrar ayuda
+ctxhelpr serve                              # Servidor MCP (usado internamente por Claude Code)
+ctxhelpr setup [-l | -g]                    # Configurar integración
+ctxhelpr uninstall [-l | -g]                # Eliminar integración
+ctxhelpr perms [-l | -g] [-a | -r]          # Gestionar permisos
 ```
+
+`serve` no está pensado para ejecutarse manualmente. Claude Code lo inicia vía stdio; se detiene automáticamente cuando la sesión termina.
+
+Cuando no se especifica `-l` ni `-g`: `setup` te pregunta cuál elegir; los otros comandos auto-detectan buscando primero un `.claude/settings.json` local, y si no existe, usan el global.
 
 ## Configuración
 
@@ -125,7 +135,7 @@ Todo esto pasa automáticamente a través del archivo de skill - no necesitás h
 ```text
 src/
 ├── main.rs                 # Punto de entrada del CLI
-├── cli/                    # Comandos setup y uninstall
+├── cli/                    # Comandos setup, uninstall, perms y permissions
 ├── server/                 # Servidor MCP (transporte stdio)
 ├── mcp/                    # Definiciones y handlers de herramientas
 ├── indexer/                # Lógica de indexación + extractores por lenguaje
