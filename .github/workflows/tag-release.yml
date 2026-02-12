@@ -18,6 +18,7 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.merge_commit_sha }}
           fetch-depth: 0
+          token: ${{ secrets.RELEASE_TOKEN }}
 
       - name: Extract version and create tag
         run: |
@@ -31,5 +32,5 @@ jobs:
 
       - name: Delete release branch
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: git push origin --delete "${{ github.event.pull_request.head.ref }}" || true
