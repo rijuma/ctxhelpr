@@ -117,9 +117,6 @@ jobs:
           echo "### Changelog" >> pr-body.md
           echo "" >> pr-body.md
           cat release-notes.md >> pr-body.md
-          echo "" >> pr-body.md
-          echo "---" >> pr-body.md
-          echo "**When this PR is merged**, a \`v${{ steps.new.outputs.version }}\` tag is automatically created, release builds are triggered, and a GitHub release is published." >> pr-body.md
 
           gh pr create \
             --title "Confirm new release v${{ steps.new.outputs.version }}" \
