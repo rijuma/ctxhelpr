@@ -3,17 +3,22 @@
 
 # ctxhelpr
 
-**Semantic code indexing for Claude Code.**
+![status: experimental](https://img.shields.io/badge/status-experimental-orange)
+
+## **Semantic code indexing for Claude Code**
 
 Every time you start a new Claude Code session, it has to re-discover your entire codebase from scratch. That's slow, expensive, and lossy. **ctxhelpr** fixes that.
 
-It's an [MCP](https://modelcontextprotocol.io/) server that pre-indexes your repository semantically - functions, classes, types, references, call chains - and stores everything in a local SQLite database. Claude Code can then navigate your codebase through a set of targeted tools instead of dumping thousands of lines of raw code into context.
+It's an [MCP](https://modelcontextprotocol.io) server that pre-indexes your repository semantically - functions, classes, types, references, call chains - and stores everything in a local SQLite database. Claude Code can then navigate your codebase through a set of targeted tools instead of dumping thousands of lines of raw code into context.
 
 The result: faster context building, fewer tokens burned, and Claude actually _understands_ the structure of your code before touching it.
 
-## Status
+## Disclaimer
 
-**This is a proof of concept.** I built it to explore the idea and see if semantic indexing could meaningfully improve the Claude Code experience. It works, it's functional, but it's not battle-tested. Expect rough edges. If you find this useful or have ideas, I'd love to hear about it.
+> [!WARNING]
+> This project is **experimental** and under active development. It has not been thoroughly tested across diverse codebases, and there is no guarantee that the semantically indexed context it provides is more effective than the context a coding agent builds on its own. Use at your own risk.
+
+If you encounter issues, have suggestions, or want to share your experience, please [open an issue](https://github.com/rijuma/ctxhelpr/issues) or reach out at [marcos@rigoli.dev](mailto:marcos@rigoli.dev).
 
 ## How it works
 
@@ -60,10 +65,10 @@ rustup update stable
 cargo build --release
 ```
 
-### Setup
+### Install
 
 ```bash
-ctxhelpr setup [-l | -g]
+ctxhelpr install [-l | -g]
 ```
 
 Registers the MCP server, installs the skill file and `/index` command, prompts to grant tool permissions, and prints the database path. Use `-l` / `--local` for the project's `.claude/` directory, or `-g` / `--global` for `~/.claude/`. If neither is specified, you'll be prompted to choose.
@@ -82,21 +87,21 @@ Removes all integrations and revokes tool permissions.
 ctxhelpr perms [-l | -g] [-a | -r]
 ```
 
-Manages which ctxhelpr tools Claude Code can call without prompting. Without flags, opens an interactive checklist. `-a` / `--all` grants all permissions; `-r` / `--remove` revokes them. During setup you'll be asked to grant all; use `ctxhelpr perms` to change them later.
+Manages which ctxhelpr tools Claude Code can call without prompting. Without flags, opens an interactive checklist. `-a` / `--all` grants all permissions; `-r` / `--remove` revokes them. During install you'll be asked to grant all; use `ctxhelpr perms` to change them later.
 
 ### CLI
 
 ```bash
 ctxhelpr                                    # Show help
 ctxhelpr serve                              # MCP server (used internally by Claude Code)
-ctxhelpr setup [-l | -g]                    # Set up integration
+ctxhelpr install [-l | -g]                  # Install integration
 ctxhelpr uninstall [-l | -g]                # Remove integration
 ctxhelpr perms [-l | -g] [-a | -r]          # Manage permissions
 ```
 
 `serve` is not meant to be run manually. Claude Code spawns it via stdio; it stops automatically when the session ends.
 
-When neither `-l` nor `-g` is specified: `setup` prompts you to choose; other commands auto-detect by checking for a local `.claude/settings.json` first, falling back to global.
+When neither `-l` nor `-g` is specified: `install` prompts you to choose; other commands auto-detect by checking for a local `.claude/settings.json` first, falling back to global.
 
 ## Configuration
 
@@ -135,7 +140,7 @@ All of this happens automatically through the skill file - you don't need to do 
 ```text
 src/
 ├── main.rs                 # CLI entry point
-├── cli/                    # setup, uninstall, perms & permissions
+├── cli/                    # install, uninstall, perms & permissions
 ├── server/                 # MCP server (stdio transport)
 ├── mcp/                    # Tool definitions and handlers
 ├── indexer/                # Core indexing logic + language extractors

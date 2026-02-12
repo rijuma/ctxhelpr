@@ -22,7 +22,7 @@ fn prompt_scope() -> Result<Scope> {
         .items(options)
         .default(0)
         .interact()
-        .map_err(|_| anyhow::anyhow!("Setup cancelled."))?;
+        .map_err(|_| anyhow::anyhow!("Install cancelled."))?;
 
     match selection {
         0 => Ok(Scope::Local),
@@ -50,8 +50,8 @@ pub fn run(scope: Scope) -> Result<()> {
 
     let cwd = std::env::current_dir()?;
     match &scope {
-        Scope::Global => println!("Setting up ctxhelpr globally...\n"),
-        _ => println!("Setting up ctxhelpr locally for {}...\n", cwd.display()),
+        Scope::Global => println!("Installing ctxhelpr globally...\n"),
+        _ => println!("Installing ctxhelpr locally for {}...\n", cwd.display()),
     }
 
     // 1. Register MCP server
@@ -128,7 +128,7 @@ pub fn run(scope: Scope) -> Result<()> {
     let db_path = db_path_for_repo(abs_path);
     println!("\n  Index database: {}", db_path.display());
 
-    println!("\nSetup complete! Restart Claude Code to start using ctxhelpr.");
+    println!("\nInstall complete! Restart Claude Code to start using ctxhelpr.");
     println!("Try: /index  or ask Claude to \"index this repository\"");
 
     Ok(())
