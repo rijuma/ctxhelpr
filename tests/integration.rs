@@ -373,11 +373,7 @@ fn test_update_files_nonexistent_file() {
     let (storage, path_str) = index_fixtures();
 
     let stats = Indexer::new()
-        .update_files(
-            &path_str,
-            &["nonexistent_file.ts".to_string()],
-            &storage,
-        )
+        .update_files(&path_str, &["nonexistent_file.ts".to_string()], &storage)
         .expect("update_files should handle missing files gracefully");
 
     assert_eq!(stats.files_changed, 0, "No files should be updated");
@@ -391,7 +387,9 @@ fn test_index_empty_directory() {
     let storage = SqliteStorage::open_memory().expect("Failed to create in-memory DB");
     let indexer = Indexer::new();
 
-    let stats = indexer.index(path_str, &storage).expect("Indexing empty dir failed");
+    let stats = indexer
+        .index(path_str, &storage)
+        .expect("Indexing empty dir failed");
 
     assert_eq!(stats.files_total, 0, "No files in empty dir");
     assert_eq!(stats.symbols_count, 0, "No symbols in empty dir");
@@ -438,5 +436,8 @@ fn test_search_no_results() {
         .search_symbols(&path_str, "zzz_nonexistent_symbol_xyz")
         .expect("search should not error on no results");
 
-    assert!(results.is_empty(), "Should return empty for nonexistent term");
+    assert!(
+        results.is_empty(),
+        "Should return empty for nonexistent term"
+    );
 }
