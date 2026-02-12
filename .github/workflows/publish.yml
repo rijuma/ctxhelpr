@@ -1,48 +1,15 @@
 name: Publish
 
 on:
-  pull_request:
-    types: [closed]
-    branches: [main]
+  push:
+    tags: ['v*']
 
 permissions:
   contents: write
 
 jobs:
-  tag:
-    if: github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'release/')
-    runs-on: ubuntu-latest
-    outputs:
-      tag: ${{ steps.version.outputs.tag }}
-      version: ${{ steps.version.outputs.version }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.merge_commit_sha }}
-          fetch-depth: 0
-
-      - name: Extract version and create tag
-        id: version
-        run: |
-          VERSION=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
-          TAG="v${VERSION}"
-          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
-          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "Tagging ${TAG}"
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag "${TAG}"
-          git push origin "${TAG}"
-
-      - name: Delete release branch
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: git push origin --delete "${{ github.event.pull_request.head.ref }}"
-
   build:
     name: Build ${{ matrix.target }}
-    needs: tag
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -68,7 +35,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ needs.tag.outputs.tag }}
+          ref: ${{ github.ref_name }}
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -93,7 +60,8 @@ jobs:
         if: runner.os != 'Windows'
         shell: bash
         run: |
-          ARCHIVE="ctxhelpr-${{ needs.tag.outputs.version }}-${{ matrix.target }}.tar.gz"
+          VERSION="${GITHUB_REF_NAME#v}"
+          ARCHIVE="ctxhelpr-${VERSION}-${{ matrix.target }}.tar.gz"
           mkdir -p staging
           cp target/${{ matrix.target }}/release/ctxhelpr staging/
           cp README.md LICENSE staging/
@@ -107,7 +75,8 @@ jobs:
         if: runner.os == 'Windows'
         shell: bash
         run: |
-          ARCHIVE="ctxhelpr-${{ needs.tag.outputs.version }}-${{ matrix.target }}.zip"
+          VERSION="${GITHUB_REF_NAME#v}"
+          ARCHIVE="ctxhelpr-${VERSION}-${{ matrix.target }}.zip"
           mkdir -p staging
           cp target/${{ matrix.target }}/release/ctxhelpr.exe staging/
           cp README.md LICENSE staging/
@@ -127,13 +96,13 @@ jobs:
 
   publish:
     name: Create Release
-    needs: [tag, build]
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ needs.tag.outputs.tag }}
+          ref: ${{ github.ref_name }}
           fetch-depth: 0
 
       - name: Download all artifacts
@@ -161,7 +130,7 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ needs.tag.outputs.tag }}
+          tag_name: ${{ github.ref_name }}
           body_path: RELEASE_NOTES.md
           make_latest: false
           files: |
