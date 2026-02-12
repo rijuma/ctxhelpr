@@ -7,7 +7,7 @@
 
 ## **Semantic code indexing for Claude Code**
 
-Every time you start a new Claude Code session, it has to re-discover your entire codebase from scratch. That's slow, expensive, and lossy. **ctxhelpr** fixes that.
+Every time you start a new Claude Code session, it has to re-discover your entire codebase from scratch. That's slow, expensive, and lossy. **ctxhelpr** tries to mitigate that.
 
 It's an [MCP](https://modelcontextprotocol.io) server that pre-indexes your repository semantically - functions, classes, types, references, call chains - and stores everything in a local SQLite database. Claude Code can then navigate your codebase through a set of targeted tools instead of dumping thousands of lines of raw code into context.
 
@@ -51,21 +51,33 @@ Infrastructure is ready for Python and Rust, but extractors aren't written yet.
 
 ## Getting started
 
-### Prerequisites
+### Download
 
-Requires Rust 1.85+ (edition 2024). If you're on an older version:
+Download the latest release for your platform from the [releases page](https://github.com/rijuma/ctxhelpr/releases/latest).
+
+| OS      | Architecture  | Asset                                         |
+| ------- | ------------- | --------------------------------------------- |
+| Linux   | x86_64        | `ctxhelpr-*-x86_64-unknown-linux-gnu.tar.gz`  |
+| Linux   | ARM64         | `ctxhelpr-*-aarch64-unknown-linux-gnu.tar.gz` |
+| macOS   | Apple Silicon | `ctxhelpr-*-aarch64-apple-darwin.tar.gz`      |
+| macOS   | Intel         | `ctxhelpr-*-x86_64-apple-darwin.tar.gz`       |
+| Windows | x86_64        | `ctxhelpr-*-x86_64-pc-windows-msvc.zip`       |
+
+### Install the binary
+
+**Linux / macOS:**
 
 ```bash
-rustup update stable
+tar xzf ctxhelpr-*.tar.gz
+sudo mv ctxhelpr /usr/local/bin/
+chmod +x /usr/local/bin/ctxhelpr
 ```
 
-### Build
+**Windows:**
 
-```bash
-cargo build --release
-```
+Extract the `.zip` file and place `ctxhelpr.exe` in a directory that is in your `PATH`.
 
-### Install
+### Set up Claude Code integration
 
 ```bash
 ctxhelpr install [-l | -g]
@@ -81,7 +93,7 @@ ctxhelpr uninstall [-l | -g]
 
 Removes all integrations and revokes tool permissions.
 
-### Permissions
+### Manage permissions
 
 ```bash
 ctxhelpr perms [-l | -g] [-a | -r]
@@ -89,19 +101,10 @@ ctxhelpr perms [-l | -g] [-a | -r]
 
 Manages which ctxhelpr tools Claude Code can call without prompting. Without flags, opens an interactive checklist. `-a` / `--all` grants all permissions; `-r` / `--remove` revokes them. During install you'll be asked to grant all; use `ctxhelpr perms` to change them later.
 
-### CLI
+### Package managers
 
-```bash
-ctxhelpr                                    # Show help
-ctxhelpr serve                              # MCP server (used internally by Claude Code)
-ctxhelpr install [-l | -g]                  # Install integration
-ctxhelpr uninstall [-l | -g]                # Remove integration
-ctxhelpr perms [-l | -g] [-a | -r]          # Manage permissions
-```
-
-`serve` is not meant to be run manually. Claude Code spawns it via stdio; it stops automatically when the session ends.
-
-When neither `-l` nor `-g` is specified: `install` prompts you to choose; other commands auto-detect by checking for a local `.claude/settings.json` first, falling back to global.
+> [!NOTE]
+> Distribution via package managers (brew, apt, npm/pnpm, etc.) is planned. For now, download the pre-built binary from the releases page.
 
 ## Configuration
 
@@ -127,15 +130,39 @@ Once set up, the workflow is transparent:
 
 All of this happens automatically through the skill file - you don't need to do anything special.
 
-## Tech stack
+## CLI reference
 
-- **Rust** (edition 2024) - because startup time and memory matter for a tool that runs alongside your editor
-- **tree-sitter** - fast, reliable parsing across languages
-- **SQLite + FTS5** - single-file database with full-text search, no external dependencies
-- **rmcp** - official Rust SDK for the Model Context Protocol
-- **tokio** - async runtime for the MCP server
+```bash
+ctxhelpr                                    # Show help
+ctxhelpr serve                              # MCP server (used internally by Claude Code)
+ctxhelpr install [-l | -g]                  # Install integration
+ctxhelpr uninstall [-l | -g]                # Remove integration
+ctxhelpr perms [-l | -g] [-a | -r]          # Manage permissions
+```
 
-## Project structure
+`serve` is not meant to be run manually. Claude Code spawns it via stdio; it stops automatically when the session ends.
+
+When neither `-l` nor `-g` is specified: `install` prompts you to choose; other commands auto-detect by checking for a local `.claude/settings.json` first, falling back to global.
+
+## Development
+
+For contributors who want to build from source or work on ctxhelpr.
+
+### Prerequisites
+
+Requires Rust 1.85+ (edition 2024). If you're on an older version:
+
+```bash
+rustup update stable
+```
+
+### Build from source
+
+```bash
+cargo build --release
+```
+
+### Project structure
 
 ```text
 src/
@@ -149,3 +176,11 @@ src/
 ├── output/                 # Token-efficient JSON formatting
 └── assets/                 # Embedded skill & command templates
 ```
+
+### Tech stack
+
+- **Rust** (edition 2024) - because startup time and memory matter for a tool that runs alongside your editor
+- **tree-sitter** - fast, reliable parsing across languages
+- **SQLite + FTS5** - single-file database with full-text search, no external dependencies
+- **rmcp** - official Rust SDK for the Model Context Protocol
+- **tokio** - async runtime for the MCP server
