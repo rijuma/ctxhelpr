@@ -52,6 +52,13 @@ The `lib.rs` re-exports `indexer`, `output`, and `storage` for use in integratio
 3. Add the extractor instance in `Indexer::new()` (`src/indexer/mod.rs`)
 4. Add test fixtures under `tests/fixtures/<lang>/`
 
+## Formatting & Linting
+
+After making code changes, always run these checks and fix any issues before considering the task done:
+
+1. `cargo fmt --all -- --check` — fix with `cargo fmt --all`
+2. `cargo clippy --all-targets --all-features -- -D warnings` — fix all warnings
+
 ## Testing
 
 Integration tests in `tests/integration.rs` use `SqliteStorage::open_memory()` and index fixture files under `tests/fixtures/typescript/`. Tests cover: indexing, incremental re-index, symbol extraction (functions, classes, interfaces, enums, arrow functions), doc comments, call references, search, and compact output format.
