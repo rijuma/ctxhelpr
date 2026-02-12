@@ -16,18 +16,23 @@ jobs:
       matrix:
         include:
           - target: x86_64-unknown-linux-gnu
+            label: linux-x64
             runner: ubuntu-latest
             cross: false
           - target: aarch64-unknown-linux-gnu
+            label: linux-arm64
             runner: ubuntu-latest
             cross: true
           - target: x86_64-pc-windows-msvc
+            label: windows-x64
             runner: windows-latest
             cross: false
           - target: x86_64-apple-darwin
+            label: macos-x64
             runner: macos-latest
             cross: false
           - target: aarch64-apple-darwin
+            label: macos-arm64
             runner: macos-latest
             cross: false
 
@@ -61,7 +66,7 @@ jobs:
         shell: bash
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          ARCHIVE="ctxhelpr-${VERSION}-${{ matrix.target }}.tar.gz"
+          ARCHIVE="ctxhelpr-${VERSION}-${{ matrix.label }}.tar.gz"
           mkdir -p staging
           cp target/${{ matrix.target }}/release/ctxhelpr staging/
           cp README.md LICENSE staging/
@@ -76,7 +81,7 @@ jobs:
         shell: bash
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          ARCHIVE="ctxhelpr-${VERSION}-${{ matrix.target }}.zip"
+          ARCHIVE="ctxhelpr-${VERSION}-${{ matrix.label }}.zip"
           mkdir -p staging
           cp target/${{ matrix.target }}/release/ctxhelpr.exe staging/
           cp README.md LICENSE staging/
@@ -89,7 +94,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.target }}
+          name: ${{ matrix.label }}
           path: |
             ctxhelpr-*
           if-no-files-found: error
