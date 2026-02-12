@@ -119,11 +119,12 @@ jobs:
           echo "---" >> pr-body.md
           echo "**When this PR is merged**, a \`v${{ steps.new.outputs.version }}\` tag is automatically created, release builds are triggered, and a GitHub release is published." >> pr-body.md
 
-          gh pr create \
-            --title "Confirm new release v${{ steps.new.outputs.version }}" \
-            --body-file pr-body.md \
-            --base main \
-            --head "release/v${{ steps.new.outputs.version }}"
+          PR_BODY=$(cat pr-body.md)
+          gh api repos/${{ github.repository }}/pulls \
+            -f title="Confirm new release v${{ steps.new.outputs.version }}" \
+            -f body="$PR_BODY" \
+            -f base="main" \
+            -f head="release/v${{ steps.new.outputs.version }}"
 
       - name: Trigger CI on release branch
         env:
