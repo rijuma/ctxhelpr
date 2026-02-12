@@ -21,8 +21,8 @@ struct Cli {
 enum Commands {
     /// Internal: MCP server started automatically by Claude Code (not for manual use)
     Serve,
-    /// Set up ctxhelpr integration with Claude Code
-    Setup(ScopeArgs),
+    /// Install ctxhelpr integration with Claude Code
+    Install(ScopeArgs),
     /// Remove ctxhelpr integration from Claude Code
     Uninstall(ScopeArgs),
     /// Manage ctxhelpr tool permissions in Claude Code
@@ -80,7 +80,7 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
     match cli.command {
         Some(Commands::Serve) => server::run().await,
-        Some(Commands::Setup(args)) => cli::setup::run(args.into_scope()),
+        Some(Commands::Install(args)) => cli::install::run(args.into_scope()),
         Some(Commands::Uninstall(args)) => cli::uninstall::run(args.into_scope()),
         Some(Commands::Perms(args)) => cli::perms::run(args.scope(), args.all, args.remove),
         None => {
