@@ -15,7 +15,6 @@ on:
 permissions:
   contents: write
   pull-requests: write
-  actions: write
 
 jobs:
   bump-version:
@@ -25,6 +24,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          token: ${{ secrets.RELEASE_TOKEN }}
 
       - name: Verify code owner authorization
         run: |
@@ -94,7 +94,9 @@ jobs:
         run: git cliff --tag "v${{ steps.new.outputs.version }}" --unreleased --strip header > release-notes.md
 
       - name: Delete pre-existing remote branch
-        run: git push origin --delete "release/v${{ steps.new.outputs.version }}" || true
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: gh api repos/${{ github.repository }}/git/refs/heads/release/v${{ steps.new.outputs.version }} -X DELETE || true
 
       - name: Commit and push branch
         run: |
@@ -106,7 +108,7 @@ jobs:
 
       - name: Create pull request
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
           echo "## Release v${{ steps.new.outputs.version }}" > pr-body.md
           echo "" >> pr-body.md
@@ -119,14 +121,8 @@ jobs:
           echo "---" >> pr-body.md
           echo "**When this PR is merged**, a \`v${{ steps.new.outputs.version }}\` tag is automatically created, release builds are triggered, and a GitHub release is published." >> pr-body.md
 
-          PR_BODY=$(cat pr-body.md)
-          gh api repos/${{ github.repository }}/pulls \
-            -f title="Confirm new release v${{ steps.new.outputs.version }}" \
-            -f body="$PR_BODY" \
-            -f base="main" \
-            -f head="release/v${{ steps.new.outputs.version }}"
-
-      - name: Trigger CI on release branch
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh workflow run ci.yml --ref "release/v${{ steps.new.outputs.version }}"
+          gh pr create \
+            --title "Confirm new release v${{ steps.new.outputs.version }}" \
+            --body-file pr-body.md \
+            --base main \
+            --head "release/v${{ steps.new.outputs.version }}"
