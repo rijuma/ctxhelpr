@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use rusqlite::{params, Connection};
+use rusqlite::{Connection, params};
 use std::path::PathBuf;
 
 use crate::indexer::{ExtractedRef, ExtractedSymbol};
@@ -404,9 +404,8 @@ impl SqliteStorage {
         order_by: &str,
         limit: usize,
     ) -> Result<Vec<SymbolRecord>> {
-        const VALID_COLUMNS: &[&str] = &[
-            "name", "kind", "file_rel_path", "signature", "doc_comment",
-        ];
+        const VALID_COLUMNS: &[&str] =
+            &["name", "kind", "file_rel_path", "signature", "doc_comment"];
         anyhow::ensure!(
             VALID_COLUMNS.contains(&column),
             "Invalid column for symbol query: {column}"
