@@ -11,6 +11,32 @@ fn fixtures_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/typescript")
 }
 
+fn python_fixtures_path() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/python")
+}
+
+fn rust_fixtures_path() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/rust")
+}
+
+fn ruby_fixtures_path() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/ruby")
+}
+
+fn markdown_fixtures_path() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/markdown")
+}
+
+fn index_lang_fixtures(path: PathBuf) -> (SqliteStorage, String) {
+    let storage = SqliteStorage::open_memory().expect("Failed to create in-memory DB");
+    let path_str = path.to_str().unwrap().to_string();
+    let indexer = Indexer::new();
+    let stats = indexer.index(&path_str, &storage).expect("Indexing failed");
+    assert!(stats.files_total > 0, "No files were processed");
+    assert!(stats.symbols_count > 0, "No symbols were extracted");
+    (storage, path_str)
+}
+
 fn index_fixtures() -> (SqliteStorage, String) {
     let storage = SqliteStorage::open_memory().expect("Failed to create in-memory DB");
     let path = fixtures_path();
@@ -439,5 +465,511 @@ fn test_search_no_results() {
     assert!(
         results.is_empty(),
         "Should return empty for nonexistent term"
+    );
+}
+
+// ==================== Python Tests ====================
+
+#[test]
+fn test_python_index_repository() {
+    let path = python_fixtures_path();
+    let path_str = path.to_str().unwrap();
+    let storage = SqliteStorage::open_memory().expect("Failed to create in-memory DB");
+    let indexer = Indexer::new();
+
+    let stats = indexer.index(path_str, &storage).expect("Indexing failed");
+
+    assert_eq!(stats.files_total, 1, "Should index 1 Python file");
+    assert!(stats.symbols_count > 0, "Should extract symbols");
+}
+
+#[test]
+fn test_python_function_signatures() {
+    let (storage, path_str) = index_lang_fixtures(python_fixtures_path());
+
+    let symbols = storage
+        .get_file_symbols(&path_str, "sample.py")
+        .expect("get_file_symbols failed");
+
+    let add = symbols
+        .iter()
+        .find(|s| s.name == "add")
+        .expect("Should find 'add'");
+    assert_eq!(add.kind, "fn");
+    let sig = add.signature.as_deref().unwrap_or("");
+    assert!(
+        sig.contains("int"),
+        "add signature should mention 'int', got: {}",
+        sig
+    );
+}
+
+#[test]
+fn test_python_class_with_methods() {
+    let (storage, path_str) = index_lang_fixtures(python_fixtures_path());
+
+    let symbols = storage
+        .get_file_symbols(&path_str, "sample.py")
+        .expect("get_file_symbols failed");
+
+    let animal = symbols
+        .iter()
+        .find(|s| s.name == "Animal")
+        .expect("Should find 'Animal'");
+    assert_eq!(animal.kind, "class");
+
+    let children: Vec<_> = symbols
+        .iter()
+        .filter(|s| s.parent_symbol_id == Some(animal.id))
+        .collect();
+    let method_names: Vec<&str> = children.iter().map(|s| s.name.as_str()).collect();
+    assert!(
+        method_names.contains(&"speak"),
+        "Animal should have 'speak' method, got: {:?}",
+        method_names
+    );
+}
+
+#[test]
+fn test_python_inheritance() {
+    let (storage, path_str) = index_lang_fixtures(python_fixtures_path());
+
+    let symbols = storage
+        .get_file_symbols(&path_str, "sample.py")
+        .expect("get_file_symbols failed");
+
+    let dog = symbols
+        .iter()
+        .find(|s| s.name == "Dog")
+        .expect("Should find 'Dog'");
+    assert_eq!(dog.kind, "class");
+
+    let refs = storage
+        .get_dependencies(&path_str, dog.id)
+        .expect("get_dependencies failed");
+    assert!(
+        refs.iter().any(|r| r.to_name == "Animal"),
+        "Dog should extend Animal, got: {:?}",
+        refs.iter().map(|r| &r.to_name).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn test_python_docstrings() {
+    let (storage, path_str) = index_lang_fixtures(python_fixtures_path());
+
+    let symbols = storage
+        .get_file_symbols(&path_str, "sample.py")
+        .expect("get_file_symbols failed");
+
+    let add = symbols
+        .iter()
+        .find(|s| s.name == "add")
+        .expect("Should find 'add'");
+    assert!(add.doc_comment.is_some(), "'add' should have a docstring");
+    assert!(
+        add.doc_comment
+            .as_deref()
+            .unwrap()
+            .contains("Adds two numbers"),
+        "Docstring should contain 'Adds two numbers'"
+    );
+}
+
+#[test]
+fn test_python_constants() {
+    let (storage, path_str) = index_lang_fixtures(python_fixtures_path());
+
+    let symbols = storage
+        .get_file_symbols(&path_str, "sample.py")
+        .expect("get_file_symbols failed");
+
+    let names: Vec<&str> = symbols.iter().map(|s| s.name.as_str()).collect();
+    assert!(
+        names.contains(&"MAX_RETRIES"),
+        "Should find 'MAX_RETRIES' constant, got: {:?}",
+        names
+    );
+}
+
+// ==================== Rust Tests ====================
+
+#[test]
+fn test_rust_index_repository() {
+    let path = rust_fixtures_path();
+    let path_str = path.to_str().unwrap();
+    let storage = SqliteStorage::open_memory().expect("Failed to create in-memory DB");
+    let indexer = Indexer::new();
+
+    let stats = indexer.index(path_str, &storage).expect("Indexing failed");
+
+    assert_eq!(stats.files_total, 1, "Should index 1 Rust file");
+    assert!(stats.symbols_count > 0, "Should extract symbols");
+}
+
+#[test]
+fn test_rust_functions() {
+    let (storage, path_str) = index_lang_fixtures(rust_fixtures_path());
+
+    let symbols = storage
+        .get_file_symbols(&path_str, "sample.rs")
+        .expect("get_file_symbols failed");
+
+    let distance = symbols
+        .iter()
+        .find(|s| s.name == "distance")
+        .expect("Should find 'distance'");
+    assert_eq!(distance.kind, "fn");
+    assert!(
+        distance.doc_comment.is_some(),
+        "'distance' should have doc comment"
+    );
+}
+
+#[test]
+fn test_rust_struct_with_fields() {
+    let (storage, path_str) = index_lang_fixtures(rust_fixtures_path());
+
+    let symbols = storage
+        .get_file_symbols(&path_str, "sample.rs")
+        .expect("get_file_symbols failed");
+
+    let point = symbols
+        .iter()
+        .find(|s| s.name == "Point")
+        .expect("Should find 'Point'");
+    assert_eq!(point.kind, "struct");
+
+    let fields: Vec<_> = symbols
+        .iter()
+        .filter(|s| s.parent_symbol_id == Some(point.id))
+        .collect();
+    let field_names: Vec<&str> = fields.iter().map(|s| s.name.as_str()).collect();
+    assert!(field_names.contains(&"x"), "Point should have 'x' field");
+    assert!(field_names.contains(&"y"), "Point should have 'y' field");
+}
+
+#[test]
+fn test_rust_enum_with_variants() {
+    let (storage, path_str) = index_lang_fixtures(rust_fixtures_path());
+
+    let symbols = storage
+        .get_file_symbols(&path_str, "sample.rs")
+        .expect("get_file_symbols failed");
+
+    let shape = symbols
+        .iter()
+        .find(|s| s.name == "Shape")
+        .expect("Should find 'Shape'");
+    assert_eq!(shape.kind, "enum");
+
+    let variants: Vec<_> = symbols
+        .iter()
+        .filter(|s| s.parent_symbol_id == Some(shape.id))
+        .collect();
+    let variant_names: Vec<&str> = variants.iter().map(|s| s.name.as_str()).collect();
+    assert!(
+        variant_names.contains(&"Circle"),
+        "Should have Circle variant"
+    );
+    assert!(
+        variant_names.contains(&"Rectangle"),
+        "Should have Rectangle variant"
+    );
+    assert!(
+        variant_names.contains(&"Triangle"),
+        "Should have Triangle variant"
+    );
+}
+
+#[test]
+fn test_rust_trait() {
+    let (storage, path_str) = index_lang_fixtures(rust_fixtures_path());
+
+    let symbols = storage
+        .get_file_symbols(&path_str, "sample.rs")
+        .expect("get_file_symbols failed");
+
+    let has_area = symbols
+        .iter()
+        .find(|s| s.name == "HasArea")
+        .expect("Should find 'HasArea'");
+    assert_eq!(has_area.kind, "trait");
+
+    let methods: Vec<_> = symbols
+        .iter()
+        .filter(|s| s.parent_symbol_id == Some(has_area.id))
+        .collect();
+    let method_names: Vec<&str> = methods.iter().map(|s| s.name.as_str()).collect();
+    assert!(
+        method_names.contains(&"area"),
+        "HasArea should have 'area' method"
+    );
+    assert!(
+        method_names.contains(&"perimeter"),
+        "HasArea should have 'perimeter' method"
+    );
+}
+
+#[test]
+fn test_rust_impl_blocks() {
+    let (storage, path_str) = index_lang_fixtures(rust_fixtures_path());
+
+    let symbols = storage
+        .get_file_symbols(&path_str, "sample.rs")
+        .expect("get_file_symbols failed");
+
+    let names: Vec<&str> = symbols.iter().map(|s| s.name.as_str()).collect();
+    assert!(
+        names
+            .iter()
+            .any(|n| n.contains("HasArea") && n.contains("Shape")),
+        "Should find 'HasArea for Shape' impl, got: {:?}",
+        names
+    );
+    assert!(
+        names.contains(&"Shape"),
+        "Should find inherent 'Shape' impl"
+    );
+}
+
+#[test]
+fn test_rust_doc_comments() {
+    let (storage, path_str) = index_lang_fixtures(rust_fixtures_path());
+
+    let symbols = storage
+        .get_file_symbols(&path_str, "sample.rs")
+        .expect("get_file_symbols failed");
+
+    let point = symbols
+        .iter()
+        .find(|s| s.name == "Point")
+        .expect("Should find 'Point'");
+    assert!(point.doc_comment.is_some(), "Point should have doc comment");
+    assert!(
+        point.doc_comment.as_deref().unwrap().contains("2D space"),
+        "Doc should mention '2D space'"
+    );
+}
+
+#[test]
+fn test_rust_modules_types_constants() {
+    let (storage, path_str) = index_lang_fixtures(rust_fixtures_path());
+
+    let symbols = storage
+        .get_file_symbols(&path_str, "sample.rs")
+        .expect("get_file_symbols failed");
+
+    let names: Vec<&str> = symbols.iter().map(|s| s.name.as_str()).collect();
+    assert!(names.contains(&"utils"), "Should find 'utils' module");
+    assert!(names.contains(&"Result"), "Should find 'Result' type alias");
+    assert!(
+        names.contains(&"MAX_SIZE"),
+        "Should find 'MAX_SIZE' constant"
+    );
+    assert!(
+        names.contains(&"GLOBAL_NAME"),
+        "Should find 'GLOBAL_NAME' static"
+    );
+}
+
+// ==================== Ruby Tests ====================
+
+#[test]
+fn test_ruby_index_repository() {
+    let path = ruby_fixtures_path();
+    let path_str = path.to_str().unwrap();
+    let storage = SqliteStorage::open_memory().expect("Failed to create in-memory DB");
+    let indexer = Indexer::new();
+
+    let stats = indexer.index(path_str, &storage).expect("Indexing failed");
+
+    assert_eq!(stats.files_total, 1, "Should index 1 Ruby file");
+    assert!(stats.symbols_count > 0, "Should extract symbols");
+}
+
+#[test]
+fn test_ruby_class_with_methods() {
+    let (storage, path_str) = index_lang_fixtures(ruby_fixtures_path());
+
+    let symbols = storage
+        .get_file_symbols(&path_str, "sample.rb")
+        .expect("get_file_symbols failed");
+
+    let animal = symbols
+        .iter()
+        .find(|s| s.name == "Animal")
+        .expect("Should find 'Animal'");
+    assert_eq!(animal.kind, "class");
+
+    let children: Vec<_> = symbols
+        .iter()
+        .filter(|s| s.parent_symbol_id == Some(animal.id))
+        .collect();
+    let method_names: Vec<&str> = children.iter().map(|s| s.name.as_str()).collect();
+    assert!(
+        method_names.contains(&"speak"),
+        "Animal should have 'speak' method, got: {:?}",
+        method_names
+    );
+    assert!(
+        method_names.contains(&"initialize"),
+        "Animal should have 'initialize' method, got: {:?}",
+        method_names
+    );
+}
+
+#[test]
+fn test_ruby_inheritance() {
+    let (storage, path_str) = index_lang_fixtures(ruby_fixtures_path());
+
+    let symbols = storage
+        .get_file_symbols(&path_str, "sample.rb")
+        .expect("get_file_symbols failed");
+
+    let dog = symbols
+        .iter()
+        .find(|s| s.name == "Dog")
+        .expect("Should find 'Dog'");
+    assert_eq!(dog.kind, "class");
+
+    let refs = storage
+        .get_dependencies(&path_str, dog.id)
+        .expect("get_dependencies failed");
+    assert!(
+        refs.iter().any(|r| r.to_name == "Animal"),
+        "Dog should extend Animal, got: {:?}",
+        refs.iter().map(|r| &r.to_name).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn test_ruby_module() {
+    let (storage, path_str) = index_lang_fixtures(ruby_fixtures_path());
+
+    let symbols = storage
+        .get_file_symbols(&path_str, "sample.rb")
+        .expect("get_file_symbols failed");
+
+    let formatter = symbols
+        .iter()
+        .find(|s| s.name == "Formatter")
+        .expect("Should find 'Formatter'");
+    assert_eq!(formatter.kind, "mod");
+
+    let children: Vec<_> = symbols
+        .iter()
+        .filter(|s| s.parent_symbol_id == Some(formatter.id))
+        .collect();
+    assert!(!children.is_empty(), "Formatter module should have methods");
+}
+
+#[test]
+fn test_ruby_singleton_method() {
+    let (storage, path_str) = index_lang_fixtures(ruby_fixtures_path());
+
+    let symbols = storage
+        .get_file_symbols(&path_str, "sample.rb")
+        .expect("get_file_symbols failed");
+
+    let names: Vec<&str> = symbols.iter().map(|s| s.name.as_str()).collect();
+    assert!(
+        names.iter().any(|n| n.contains("breed_info")),
+        "Should find 'breed_info' singleton method, got: {:?}",
+        names
+    );
+}
+
+#[test]
+fn test_ruby_constants() {
+    let (storage, path_str) = index_lang_fixtures(ruby_fixtures_path());
+
+    let symbols = storage
+        .get_file_symbols(&path_str, "sample.rb")
+        .expect("get_file_symbols failed");
+
+    let names: Vec<&str> = symbols.iter().map(|s| s.name.as_str()).collect();
+    assert!(
+        names.contains(&"MAX_RETRIES"),
+        "Should find 'MAX_RETRIES' constant, got: {:?}",
+        names
+    );
+}
+
+// ==================== Markdown Tests ====================
+
+#[test]
+fn test_markdown_index_repository() {
+    let path = markdown_fixtures_path();
+    let path_str = path.to_str().unwrap();
+    let storage = SqliteStorage::open_memory().expect("Failed to create in-memory DB");
+    let indexer = Indexer::new();
+
+    let stats = indexer.index(path_str, &storage).expect("Indexing failed");
+
+    assert_eq!(stats.files_total, 1, "Should index 1 Markdown file");
+    assert!(stats.symbols_count > 0, "Should extract sections");
+}
+
+#[test]
+fn test_markdown_heading_extraction() {
+    let (storage, path_str) = index_lang_fixtures(markdown_fixtures_path());
+
+    let symbols = storage
+        .get_file_symbols(&path_str, "sample.md")
+        .expect("get_file_symbols failed");
+
+    let names: Vec<&str> = symbols.iter().map(|s| s.name.as_str()).collect();
+    assert!(
+        names.contains(&"Project Overview"),
+        "Should find 'Project Overview' heading, got: {:?}",
+        names
+    );
+    assert!(
+        names.contains(&"Installation"),
+        "Should find 'Installation' heading, got: {:?}",
+        names
+    );
+}
+
+#[test]
+fn test_markdown_heading_hierarchy() {
+    let (storage, path_str) = index_lang_fixtures(markdown_fixtures_path());
+
+    let symbols = storage
+        .get_file_symbols(&path_str, "sample.md")
+        .expect("get_file_symbols failed");
+
+    // H1 "Project Overview" should be top-level
+    let overview = symbols
+        .iter()
+        .find(|s| s.name == "Project Overview")
+        .expect("Should find 'Project Overview'");
+    assert_eq!(overview.kind, "section");
+    assert!(
+        overview.parent_symbol_id.is_none(),
+        "H1 should be top-level (no parent)"
+    );
+
+    // H2 "Installation" should be a child of H1
+    let installation = symbols
+        .iter()
+        .find(|s| s.name == "Installation")
+        .expect("Should find 'Installation'");
+    assert_eq!(
+        installation.parent_symbol_id,
+        Some(overview.id),
+        "H2 'Installation' should be child of H1 'Project Overview'"
+    );
+
+    // H3 "Prerequisites" should be a child of H2 "Installation"
+    let prereqs = symbols
+        .iter()
+        .find(|s| s.name == "Prerequisites")
+        .expect("Should find 'Prerequisites'");
+    assert_eq!(
+        prereqs.parent_symbol_id,
+        Some(installation.id),
+        "H3 'Prerequisites' should be child of H2 'Installation'"
     );
 }

@@ -1,3 +1,7 @@
+pub mod markdown;
+pub mod python;
+pub mod ruby;
+pub mod rust_lang;
 pub mod typescript;
 
 use crate::indexer::ExtractedSymbol;
@@ -13,6 +17,8 @@ pub fn detect_language(ext: &str) -> Option<&'static str> {
         "ts" | "tsx" | "js" | "jsx" | "mjs" | "cjs" => Some("typescript"),
         "py" | "pyi" => Some("python"),
         "rs" => Some("rust"),
+        "rb" => Some("ruby"),
+        "md" | "markdown" => Some("markdown"),
         _ => None,
     }
 }
