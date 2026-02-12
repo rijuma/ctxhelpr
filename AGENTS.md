@@ -27,7 +27,7 @@ cargo test test_name -- --nocapture  # Run with stdout/stderr visible
 RUST_LOG=ctxhelpr=debug cargo run -- serve   # Run MCP server with debug logging
 ```
 
-The binary has three subcommands: `serve` (MCP stdio server), `setup` (register with Claude Code), `uninstall` (remove integration).
+The binary has four subcommands: `serve` (MCP stdio server), `install` (register with Claude Code), `uninstall` (remove integration), `perms` (manage tool permissions).
 
 ## Architecture
 
@@ -40,7 +40,7 @@ Key modules:
 - **`indexer/languages/`** — One module per language. Currently only `typescript.rs` is implemented. Each extractor returns `Vec<ExtractedSymbol>` from tree-sitter AST traversal. Python and Rust extractors are planned (dependencies already in Cargo.toml).
 - **`storage/`** — `SqliteStorage` wraps rusqlite. Schema is in `schema.sql` (loaded via `include_str!`). DB is per-repo, stored at `~/.cache/ctxhelpr/<hash>.db`. FTS5 virtual table with triggers keeps full-text index in sync. Provides `begin_transaction()`/`commit()` for batching — the indexer wraps all operations in a single transaction for performance.
 - **`output/`** — `CompactFormatter` produces token-efficient JSON with short keys (`n`, `k`, `f`, `l`, `sig`, `doc`, `id`).
-- **`cli/`** — `setup.rs` registers the MCP server, installs a skill file and `/index` command into `~/.claude/`. `uninstall.rs` reverses this.
+- **`cli/`** — `install.rs` registers the MCP server, installs a skill file and `/index` command into `~/.claude/`. `uninstall.rs` reverses this.
 - **`assets/`** — Embedded markdown templates for the skill and slash command (included at compile time).
 
 The `lib.rs` re-exports `indexer`, `output`, and `storage` for use in integration tests.

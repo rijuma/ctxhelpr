@@ -3,17 +3,22 @@
 
 # ctxhelpr
 
-**Indexación semántica de código para Claude Code.**
+![status: experimental](https://img.shields.io/badge/status-experimental-orange)
+
+## **Indexación semántica de código para Claude Code**
 
 Cada vez que iniciás una nueva sesión de Claude Code, tiene que redescubrir todo tu codebase desde cero. Eso es lento, caro y se pierde información. **ctxhelpr** soluciona eso.
 
-Es un servidor [MCP](https://modelcontextprotocol.io/) que pre-indexa tu repositorio semánticamente - funciones, clases, tipos, referencias, cadenas de llamadas - y guarda todo en una base de datos SQLite local. Claude Code puede entonces navegar tu código a través de herramientas específicas en lugar de volcar miles de líneas de código crudo en el contexto.
+Es un servidor [MCP](https://modelcontextprotocol.io) que pre-indexa tu repositorio semánticamente - funciones, clases, tipos, referencias, cadenas de llamadas - y guarda todo en una base de datos SQLite local. Claude Code puede entonces navegar tu código a través de herramientas específicas en lugar de volcar miles de líneas de código crudo en el contexto.
 
 El resultado: construcción de contexto más rápida, menos tokens gastados, y Claude _entiende_ la estructura de tu código antes de tocarlo.
 
-## Estado
+## Aviso
 
-**Esto es una prueba de concepto.** Lo construí para explorar la idea y ver si la indexación semántica podía mejorar significativamente la experiencia con Claude Code. Funciona, es operativo, pero no está probado en batalla. Esperá asperezas. Si te resulta útil o tenés ideas, me encantaría escucharlas.
+> [!WARNING]
+> Este proyecto es **experimental** y está en desarrollo activo. No ha sido probado exhaustivamente en diversos codebases, y no hay garantía de que el contexto indexado semánticamente sea más efectivo que el contexto que un agente de código construye por su cuenta. Usalo bajo tu propio riesgo.
+
+Si encontrás problemas, tenés sugerencias o querés compartir tu experiencia, por favor [abrí un issue](https://github.com/rijuma/ctxhelpr/issues) o escribime a [marcos@rigoli.dev](mailto:marcos@rigoli.dev).
 
 ## Cómo funciona
 
@@ -60,10 +65,10 @@ rustup update stable
 cargo build --release
 ```
 
-### Configuración inicial
+### Instalar
 
 ```bash
-ctxhelpr setup [-l | -g]
+ctxhelpr install [-l | -g]
 ```
 
 Registra el servidor MCP, instala el archivo de skill y el comando `/index`, ofrece otorgar permisos a las herramientas, y muestra la ruta de la base de datos. Usá `-l` / `--local` para el directorio `.claude/` del proyecto, o `-g` / `--global` para `~/.claude/`. Si no se especifica ninguno, se te preguntará cuál elegir.
@@ -82,21 +87,21 @@ Elimina todas las integraciones y revoca permisos de herramientas.
 ctxhelpr perms [-l | -g] [-a | -r]
 ```
 
-Gestiona qué herramientas de ctxhelpr puede llamar Claude Code sin preguntar. Sin flags, abre un checklist interactivo. `-a` / `--all` otorga todos los permisos; `-r` / `--remove` los revoca. Durante setup se te preguntará si querés otorgar todos; usá `ctxhelpr perms` para cambiarlos después.
+Gestiona qué herramientas de ctxhelpr puede llamar Claude Code sin preguntar. Sin flags, abre un checklist interactivo. `-a` / `--all` otorga todos los permisos; `-r` / `--remove` los revoca. Durante la instalación se te preguntará si querés otorgar todos; usá `ctxhelpr perms` para cambiarlos después.
 
 ### CLI
 
 ```bash
 ctxhelpr                                    # Mostrar ayuda
 ctxhelpr serve                              # Servidor MCP (usado internamente por Claude Code)
-ctxhelpr setup [-l | -g]                    # Configurar integración
+ctxhelpr install [-l | -g]                  # Instalar integración
 ctxhelpr uninstall [-l | -g]                # Eliminar integración
 ctxhelpr perms [-l | -g] [-a | -r]          # Gestionar permisos
 ```
 
 `serve` no está pensado para ejecutarse manualmente. Claude Code lo inicia vía stdio; se detiene automáticamente cuando la sesión termina.
 
-Cuando no se especifica `-l` ni `-g`: `setup` te pregunta cuál elegir; los otros comandos auto-detectan buscando primero un `.claude/settings.json` local, y si no existe, usan el global.
+Cuando no se especifica `-l` ni `-g`: `install` te pregunta cuál elegir; los otros comandos auto-detectan buscando primero un `.claude/settings.json` local, y si no existe, usan el global.
 
 ## Configuración
 
@@ -135,7 +140,7 @@ Todo esto pasa automáticamente a través del archivo de skill - no necesitás h
 ```text
 src/
 ├── main.rs                 # Punto de entrada del CLI
-├── cli/                    # Comandos setup, uninstall, perms y permissions
+├── cli/                    # Comandos install, uninstall, perms y permissions
 ├── server/                 # Servidor MCP (transporte stdio)
 ├── mcp/                    # Definiciones y handlers de herramientas
 ├── indexer/                # Lógica de indexación + extractores por lenguaje

@@ -1,6 +1,6 @@
+pub mod install;
 pub mod permissions;
 pub mod perms;
-pub mod setup;
 pub mod uninstall;
 
 use anyhow::Result;
