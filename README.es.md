@@ -55,13 +55,13 @@ La infraestructura está lista para Python y Rust, pero los extractores todavía
 
 Descargá la última versión para tu plataforma desde la [página de releases](https://github.com/rijuma/ctxhelpr/releases/latest).
 
-| SO      | Arquitectura  | Archivo                                       |
-| ------- | ------------- | --------------------------------------------- |
-| Linux   | x86_64        | `ctxhelpr-*-x86_64-unknown-linux-gnu.tar.gz`  |
-| Linux   | ARM64         | `ctxhelpr-*-aarch64-unknown-linux-gnu.tar.gz` |
-| macOS   | Apple Silicon | `ctxhelpr-*-aarch64-apple-darwin.tar.gz`      |
-| macOS   | Intel         | `ctxhelpr-*-x86_64-apple-darwin.tar.gz`       |
-| Windows | x86_64        | `ctxhelpr-*-x86_64-pc-windows-msvc.zip`       |
+| SO      | Arquitectura  | Archivo                              |
+| ------- | ------------- | ------------------------------------ |
+| Linux   | x86_64        | `ctxhelpr-*-linux-x64.tar.gz`        |
+| Linux   | ARM64         | `ctxhelpr-*-linux-arm64.tar.gz`      |
+| macOS   | Apple Silicon | `ctxhelpr-*-macos-arm64.tar.gz`      |
+| macOS   | Intel         | `ctxhelpr-*-macos-x64.tar.gz`        |
+| Windows | x86_64        | `ctxhelpr-*-windows-x64.zip`         |
 
 ### Instalar el binario
 
