@@ -15,6 +15,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  actions: write
 
 jobs:
   bump-version:
@@ -89,6 +90,12 @@ jobs:
       - name: Generate changelog
         run: git cliff --tag "v${{ steps.new.outputs.version }}" --output CHANGELOG.md
 
+      - name: Extract release notes for PR
+        run: git cliff --tag "v${{ steps.new.outputs.version }}" --unreleased --strip header > release-notes.md
+
+      - name: Delete pre-existing remote branch
+        run: git push origin --delete "release/v${{ steps.new.outputs.version }}" || true
+
       - name: Commit and push branch
         run: |
           git config user.name "github-actions[bot]"
@@ -101,19 +108,24 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          cat > pr-body.md << 'EOF'
-          ## Release v${{ steps.new.outputs.version }}
-
-          Bumps version from ${{ steps.current.outputs.version }} to ${{ steps.new.outputs.version }} (${{ inputs.bump }}).
-
-          **When this PR is merged:**
-          1. A `v${{ steps.new.outputs.version }}` tag is automatically created
-          2. Release builds are triggered for all platforms
-          3. A GitHub release is published with pre-built binaries
-          EOF
+          echo "## Release v${{ steps.new.outputs.version }}" > pr-body.md
+          echo "" >> pr-body.md
+          echo "Bumps version from ${{ steps.current.outputs.version }} to ${{ steps.new.outputs.version }} (${{ inputs.bump }})." >> pr-body.md
+          echo "" >> pr-body.md
+          echo "### Changelog" >> pr-body.md
+          echo "" >> pr-body.md
+          cat release-notes.md >> pr-body.md
+          echo "" >> pr-body.md
+          echo "---" >> pr-body.md
+          echo "**When this PR is merged**, a \`v${{ steps.new.outputs.version }}\` tag is automatically created, release builds are triggered, and a GitHub release is published." >> pr-body.md
 
           gh pr create \
-            --title "chore: release v${{ steps.new.outputs.version }}" \
+            --title "Confirm new release v${{ steps.new.outputs.version }}" \
             --body-file pr-body.md \
             --base main \
             --head "release/v${{ steps.new.outputs.version }}"
+
+      - name: Trigger CI on release branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run ci.yml --ref "release/v${{ steps.new.outputs.version }}"
