@@ -2,45 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.0.1] - 2026-02-12
+## [1.0.2] - 2026-02-12
+
+### Bug Fixes
+
+- Fixed x86 apple build ([19acef0](https://github.com/rijuma/ctxhelpr/commit/19acef05ea6e990fb473003cf8a89564810189c6))
 
 ### Miscellaneous
 
-- Fix tag and build ([0eb4dd0](https://github.com/rijuma/ctxhelpr/commit/0eb4dd041ada64176e7fd2afa4731b667b6fcc1f))
-## [1.0.0] - 2026-02-12
+- Improved asset name for builds ([bbe2703](https://github.com/rijuma/ctxhelpr/commit/bbe27033cd13ef6d8fd0c99072b4726416864eea))
+## [1.0.1] - 2026-02-12
 
 ### Bug Fixes
 
 - Tag release fix ([77212b1](https://github.com/rijuma/ctxhelpr/commit/77212b10e3e3410c7a5be78d7cfb6b080c852b2f))
 
-### Other
-
-- Confirm new release v1.0.0 (#15)
-
-## Release v1.0.0
-
-Bumps version from 0.2.0 to 1.0.0 (major).
-
-### Changelog
-
-## [1.0.0] - 2026-02-12
-
-### Bug Fixes
-
-- Tag release fix
-([77212b1](https://github.com/rijuma/ctxhelpr/commit/77212b10e3e3410c7a5be78d7cfb6b080c852b2f))
-
-
----
-**When this PR is merged**, a `v1.0.0` tag is automatically created,
-release builds are triggered, and a GitHub release is published.
-
-Co-authored-by: github-actions[bot] <github-actions[bot]@users.noreply.github.com> ([eb20434](https://github.com/rijuma/ctxhelpr/commit/eb2043411f9774b77ab4184f8f088677822b59e0))
-## [0.2.0] - 2026-02-12
-
 ### Miscellaneous
 
 - First commit ([4709814](https://github.com/rijuma/ctxhelpr/commit/4709814c96e41d3a1b477ba1596aa061969bc5a5))
+- Fix tag and build ([0eb4dd0](https://github.com/rijuma/ctxhelpr/commit/0eb4dd041ada64176e7fd2afa4731b667b6fcc1f))
 
 ### Other
 
@@ -204,4 +184,46 @@ Co-authored-by: Rijuma <=>
 release builds are triggered, and a GitHub release is published.
 
 Co-authored-by: github-actions[bot] <github-actions[bot]@users.noreply.github.com> ([7452658](https://github.com/rijuma/ctxhelpr/commit/7452658b04e2f4af76db2fb6501e7413731e3468))
+- Confirm new release v1.0.0 (#15)
+
+## Release v1.0.0
+
+Bumps version from 0.2.0 to 1.0.0 (major).
+
+### Changelog
+
+## [1.0.0] - 2026-02-12
+
+### Bug Fixes
+
+- Tag release fix
+([77212b1](https://github.com/rijuma/ctxhelpr/commit/77212b10e3e3410c7a5be78d7cfb6b080c852b2f))
+
+
+---
+**When this PR is merged**, a `v1.0.0` tag is automatically created,
+release builds are triggered, and a GitHub release is published.
+
+Co-authored-by: github-actions[bot] <github-actions[bot]@users.noreply.github.com> ([eb20434](https://github.com/rijuma/ctxhelpr/commit/eb2043411f9774b77ab4184f8f088677822b59e0))
+- Confirm new release v1.0.1 (#16)
+
+## Release v1.0.1
+
+Bumps version from 1.0.0 to 1.0.1 (patch).
+
+### Changelog
+
+## [1.0.1] - 2026-02-12
+
+### Miscellaneous
+
+- Fix tag and build
+([0eb4dd0](https://github.com/rijuma/ctxhelpr/commit/0eb4dd041ada64176e7fd2afa4731b667b6fcc1f))
+
+
+---
+**When this PR is merged**, a `v1.0.1` tag is automatically created,
+release builds are triggered, and a GitHub release is published.
+
+Co-authored-by: github-actions[bot] <github-actions[bot]@users.noreply.github.com> ([cc53886](https://github.com/rijuma/ctxhelpr/commit/cc5388636350f48eccb78b926f8d770338147a6b))
 

@@ -254,7 +254,7 @@ dependencies = [
 
 [[package]]
 name = "ctxhelpr"
-version = "1.0.1"
+version = "1.0.2"
 dependencies = [
  "anyhow",
  "clap",
