@@ -1,0 +1,128 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Version bump type"
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  bump-version:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_TOKEN }}
+
+      - name: Verify code owner authorization
+        run: |
+          ACTOR="${{ github.actor }}"
+          # Parse CODEOWNERS: strip comments, extract @-mentions, deduplicate
+          OWNERS=$(grep -v '^\s*#' .github/CODEOWNERS | grep -oP '@\K[\w-]+' | sort -u | tr '\n' ',' | sed 's/,$//')
+          if ! echo ",$OWNERS," | grep -qi ",$ACTOR,"; then
+            echo "::error::$ACTOR is not a code owner. Only code owners can create releases."
+            exit 1
+          fi
+
+      - name: Parse current version
+        id: current
+        run: |
+          VERSION=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+          echo "major=$MAJOR" >> "$GITHUB_OUTPUT"
+          echo "minor=$MINOR" >> "$GITHUB_OUTPUT"
+          echo "patch=$PATCH" >> "$GITHUB_OUTPUT"
+
+      - name: Calculate new version
+        id: new
+        run: |
+          MAJOR=${{ steps.current.outputs.major }}
+          MINOR=${{ steps.current.outputs.minor }}
+          PATCH=${{ steps.current.outputs.patch }}
+
+          case "${{ inputs.bump }}" in
+            major)
+              MAJOR=$((MAJOR + 1))
+              MINOR=0
+              PATCH=0
+              ;;
+            minor)
+              MINOR=$((MINOR + 1))
+              PATCH=0
+              ;;
+            patch)
+              PATCH=$((PATCH + 1))
+              ;;
+          esac
+
+          NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+          echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+          echo "New version: $NEW_VERSION"
+
+      - name: Create release branch
+        run: git checkout -b "release/v${{ steps.new.outputs.version }}"
+
+      - name: Update Cargo.toml
+        run: |
+          sed -i "0,/^version = \".*\"/s//version = \"${{ steps.new.outputs.version }}\"/" Cargo.toml
+
+      - name: Update Cargo.lock
+        run: cargo update --workspace
+
+      - name: Install git-cliff
+        uses: taiki-e/install-action@v2
+        with:
+          tool: git-cliff
+
+      - name: Generate changelog
+        run: git cliff --tag "v${{ steps.new.outputs.version }}" --output CHANGELOG.md
+
+      - name: Extract release notes for PR
+        run: git cliff --tag "v${{ steps.new.outputs.version }}" --unreleased --strip header > release-notes.md
+
+      - name: Delete pre-existing remote branch
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: gh api repos/${{ github.repository }}/git/refs/heads/release/v${{ steps.new.outputs.version }} -X DELETE || true
+
+      - name: Commit and push branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Cargo.toml Cargo.lock CHANGELOG.md
+          git commit -m "chore: bump version to ${{ steps.new.outputs.version }}"
+          git push origin "release/v${{ steps.new.outputs.version }}"
+
+      - name: Create pull request
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          echo "## Release v${{ steps.new.outputs.version }}" > pr-body.md
+          echo "" >> pr-body.md
+          echo "Bumps version from ${{ steps.current.outputs.version }} to ${{ steps.new.outputs.version }} (${{ inputs.bump }})." >> pr-body.md
+          echo "" >> pr-body.md
+          echo "### Changelog" >> pr-body.md
+          echo "" >> pr-body.md
+          cat release-notes.md >> pr-body.md
+          echo "" >> pr-body.md
+          echo "---" >> pr-body.md
+          echo "**When this PR is merged**, a \`v${{ steps.new.outputs.version }}\` tag is automatically created, release builds are triggered, and a GitHub release is published." >> pr-body.md
+
+          gh pr create \
+            --title "Confirm new release v${{ steps.new.outputs.version }}" \
+            --body-file pr-body.md \
+            --base main \
+            --head "release/v${{ steps.new.outputs.version }}"
