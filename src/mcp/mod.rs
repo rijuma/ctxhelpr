@@ -8,8 +8,9 @@ use schemars::JsonSchema;
 use serde::Deserialize;
 use std::sync::Arc;
 
+use crate::config::ConfigCache;
 use crate::indexer::Indexer;
-use crate::output::CompactFormatter;
+use crate::output::{CompactFormatter, OutputFormatter, TokenBudget};
 use crate::storage::SqliteStorage;
 
 type McpError = rmcp::ErrorData;
@@ -20,6 +21,8 @@ type McpError = rmcp::ErrorData;
 pub struct RepoPathParams {
     /// Absolute path to the repository root
     pub path: String,
+    /// Optional token budget — limits response size (approximate, 1 token ≈ 4 bytes)
+    pub max_tokens: Option<usize>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -36,6 +39,8 @@ pub struct FileSymbolsParams {
     pub path: String,
     /// Relative file path within the repo
     pub file: String,
+    /// Optional token budget — limits response size (approximate, 1 token ≈ 4 bytes)
+    pub max_tokens: Option<usize>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -44,6 +49,8 @@ pub struct SymbolIdParams {
     pub path: String,
     /// Symbol ID from a previous query
     pub symbol_id: i64,
+    /// Optional token budget — limits response size (approximate, 1 token ≈ 4 bytes)
+    pub max_tokens: Option<usize>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -52,6 +59,19 @@ pub struct SearchParams {
     pub path: String,
     /// Search query (supports FTS5 syntax: AND, OR, NOT, prefix*)
     pub query: String,
+    /// Optional token budget — limits response size (approximate, 1 token ≈ 4 bytes)
+    pub max_tokens: Option<usize>,
+}
+
+fn resolve_budget(param_budget: Option<usize>, config_budget: Option<usize>) -> Option<usize> {
+    param_budget.or(config_budget)
+}
+
+fn apply_budget(output: String, max_tokens: Option<usize>, array_key: &str) -> String {
+    match max_tokens {
+        Some(limit) => TokenBudget::from_tokens(limit).truncate_json(&output, array_key),
+        None => output,
+    }
 }
 
 // ── Server ────────────────────────────────────────────────
@@ -59,6 +79,8 @@ pub struct SearchParams {
 #[derive(Clone)]
 pub struct CtxhelprServer {
     indexer: Arc<Indexer>,
+    formatter: Arc<dyn OutputFormatter>,
+    config_cache: Arc<ConfigCache>,
     tool_router: ToolRouter<Self>,
 }
 
@@ -72,6 +94,8 @@ impl CtxhelprServer {
     pub fn new() -> Self {
         Self {
             indexer: Arc::new(Indexer::new()),
+            formatter: Arc::new(CompactFormatter),
+            config_cache: Arc::new(ConfigCache::new()),
             tool_router: Self::tool_router(),
         }
     }
@@ -84,13 +108,14 @@ impl CtxhelprServer {
         Parameters(params): Parameters<RepoPathParams>,
     ) -> Result<CallToolResult, McpError> {
         tracing::info!(path = %params.path, "index_repository");
+        let config = self.config_cache.get(&params.path);
         let storage = open_storage(&params.path)?;
         let stats = self
             .indexer
-            .index(&params.path, &storage)
+            .index(&params.path, &storage, &config.indexer.ignore)
             .map_err(|e| McpError::internal_error(format!("Indexing failed: {e}"), None))?;
         Ok(CallToolResult::success(vec![Content::text(
-            CompactFormatter::format_index_result(&stats),
+            self.formatter.format_index_result(&stats),
         )]))
     }
 
@@ -102,13 +127,19 @@ impl CtxhelprServer {
         Parameters(params): Parameters<UpdateFilesParams>,
     ) -> Result<CallToolResult, McpError> {
         tracing::info!(path = %params.path, file_count = params.files.len(), "update_files");
+        let config = self.config_cache.get(&params.path);
         let storage = open_storage(&params.path)?;
         let stats = self
             .indexer
-            .update_files(&params.path, &params.files, &storage)
+            .update_files(
+                &params.path,
+                &params.files,
+                &storage,
+                &config.indexer.ignore,
+            )
             .map_err(|e| McpError::internal_error(format!("Update failed: {e}"), None))?;
         Ok(CallToolResult::success(vec![Content::text(
-            CompactFormatter::format_update_result(&stats),
+            self.formatter.format_update_result(&stats),
         )]))
     }
 
@@ -120,13 +151,14 @@ impl CtxhelprServer {
         Parameters(params): Parameters<RepoPathParams>,
     ) -> Result<CallToolResult, McpError> {
         tracing::info!(path = %params.path, "get_overview");
+        let config = self.config_cache.get(&params.path);
         let storage = open_storage(&params.path)?;
         let data = storage
             .get_overview(&params.path)
             .map_err(|e| McpError::internal_error(format!("Query failed: {e}"), None))?;
-        Ok(CallToolResult::success(vec![Content::text(
-            CompactFormatter::format_overview(&data),
-        )]))
+        let budget = resolve_budget(params.max_tokens, config.output.max_tokens);
+        let output = apply_budget(self.formatter.format_overview(&data), budget, "top_types");
+        Ok(CallToolResult::success(vec![Content::text(output)]))
     }
 
     #[tool(
@@ -137,13 +169,18 @@ impl CtxhelprServer {
         Parameters(params): Parameters<FileSymbolsParams>,
     ) -> Result<CallToolResult, McpError> {
         tracing::info!(path = %params.path, file = %params.file, "get_file_symbols");
+        let config = self.config_cache.get(&params.path);
         let storage = open_storage(&params.path)?;
         let symbols = storage
             .get_file_symbols(&params.path, &params.file)
             .map_err(|e| McpError::internal_error(format!("Query failed: {e}"), None))?;
-        Ok(CallToolResult::success(vec![Content::text(
-            CompactFormatter::format_file_symbols(&params.file, &symbols),
-        )]))
+        let budget = resolve_budget(params.max_tokens, config.output.max_tokens);
+        let output = apply_budget(
+            self.formatter.format_file_symbols(&params.file, &symbols),
+            budget,
+            "syms",
+        );
+        Ok(CallToolResult::success(vec![Content::text(output)]))
     }
 
     #[tool(
@@ -154,6 +191,7 @@ impl CtxhelprServer {
         Parameters(params): Parameters<SymbolIdParams>,
     ) -> Result<CallToolResult, McpError> {
         tracing::info!(path = %params.path, symbol_id = params.symbol_id, "get_symbol_detail");
+        let config = self.config_cache.get(&params.path);
         let storage = open_storage(&params.path)?;
         let sym = storage
             .get_symbol_detail(&params.path, params.symbol_id)
@@ -171,9 +209,14 @@ impl CtxhelprServer {
                 Vec::new()
             });
         let type_refs = Vec::new();
-        Ok(CallToolResult::success(vec![Content::text(
-            CompactFormatter::format_symbol_detail(&sym, &calls, &called_by, &type_refs),
-        )]))
+        let budget = resolve_budget(params.max_tokens, config.output.max_tokens);
+        let output = apply_budget(
+            self.formatter
+                .format_symbol_detail(&sym, &calls, &called_by, &type_refs),
+            budget,
+            "called_by",
+        );
+        Ok(CallToolResult::success(vec![Content::text(output)]))
     }
 
     #[tool(
@@ -184,13 +227,20 @@ impl CtxhelprServer {
         Parameters(params): Parameters<SearchParams>,
     ) -> Result<CallToolResult, McpError> {
         tracing::info!(path = %params.path, query = %params.query, "search_symbols");
+        let config = self.config_cache.get(&params.path);
         let storage = open_storage(&params.path)?;
-        let results = storage
+        let mut results = storage
             .search_symbols(&params.path, &params.query)
             .map_err(|e| McpError::internal_error(format!("Search failed: {e}"), None))?;
-        Ok(CallToolResult::success(vec![Content::text(
-            CompactFormatter::format_search_results(&params.query, &results),
-        )]))
+        results.truncate(config.search.max_results);
+        let budget = resolve_budget(params.max_tokens, config.output.max_tokens);
+        let output = apply_budget(
+            self.formatter
+                .format_search_results(&params.query, &results),
+            budget,
+            "hits",
+        );
+        Ok(CallToolResult::success(vec![Content::text(output)]))
     }
 
     #[tool(
@@ -201,13 +251,18 @@ impl CtxhelprServer {
         Parameters(params): Parameters<SymbolIdParams>,
     ) -> Result<CallToolResult, McpError> {
         tracing::info!(path = %params.path, symbol_id = params.symbol_id, "get_references");
+        let config = self.config_cache.get(&params.path);
         let storage = open_storage(&params.path)?;
         let refs = storage
             .get_references(&params.path, params.symbol_id)
             .map_err(|e| McpError::internal_error(format!("Query failed: {e}"), None))?;
-        Ok(CallToolResult::success(vec![Content::text(
-            CompactFormatter::format_references(params.symbol_id, &refs),
-        )]))
+        let budget = resolve_budget(params.max_tokens, config.output.max_tokens);
+        let output = apply_budget(
+            self.formatter.format_references(params.symbol_id, &refs),
+            budget,
+            "refs_to",
+        );
+        Ok(CallToolResult::success(vec![Content::text(output)]))
     }
 
     #[tool(
@@ -218,13 +273,18 @@ impl CtxhelprServer {
         Parameters(params): Parameters<SymbolIdParams>,
     ) -> Result<CallToolResult, McpError> {
         tracing::info!(path = %params.path, symbol_id = params.symbol_id, "get_dependencies");
+        let config = self.config_cache.get(&params.path);
         let storage = open_storage(&params.path)?;
         let deps = storage
             .get_dependencies(&params.path, params.symbol_id)
             .map_err(|e| McpError::internal_error(format!("Query failed: {e}"), None))?;
-        Ok(CallToolResult::success(vec![Content::text(
-            CompactFormatter::format_dependencies(params.symbol_id, &deps),
-        )]))
+        let budget = resolve_budget(params.max_tokens, config.output.max_tokens);
+        let output = apply_budget(
+            self.formatter.format_dependencies(params.symbol_id, &deps),
+            budget,
+            "deps",
+        );
+        Ok(CallToolResult::success(vec![Content::text(output)]))
     }
 
     #[tool(
@@ -240,7 +300,7 @@ impl CtxhelprServer {
             .get_index_status(&params.path)
             .map_err(|e| McpError::internal_error(format!("Status failed: {e}"), None))?;
         Ok(CallToolResult::success(vec![Content::text(
-            CompactFormatter::format_index_status(&status),
+            self.formatter.format_index_status(&status),
         )]))
     }
 }

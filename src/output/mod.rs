@@ -1,13 +1,22 @@
+pub mod formatter;
+pub mod token_budget;
+
 use std::collections::HashMap;
 
 use serde_json::{Value, json};
 
+pub use formatter::OutputFormatter;
+pub use token_budget::TokenBudget;
+
 use crate::storage::*;
+
+const MAX_SIG_LEN: usize = 120;
+const MAX_DOC_BRIEF_LEN: usize = 100;
 
 pub struct CompactFormatter;
 
-impl CompactFormatter {
-    pub fn format_index_result(stats: &IndexStats) -> String {
+impl OutputFormatter for CompactFormatter {
+    fn format_index_result(&self, stats: &IndexStats) -> String {
         json!({
             "status": "ok",
             "stats": {
@@ -24,7 +33,7 @@ impl CompactFormatter {
         .to_string()
     }
 
-    pub fn format_update_result(stats: &IndexStats) -> String {
+    fn format_update_result(&self, stats: &IndexStats) -> String {
         json!({
             "status": "ok",
             "updated": stats.files_changed,
@@ -35,7 +44,7 @@ impl CompactFormatter {
         .to_string()
     }
 
-    pub fn format_overview(data: &OverviewData) -> String {
+    fn format_overview(&self, data: &OverviewData) -> String {
         let langs: Value = data
             .languages
             .iter()
@@ -49,8 +58,8 @@ impl CompactFormatter {
             .map(|m| json!({"p": m.path, "files": m.file_count, "syms": m.symbol_count}))
             .collect();
 
-        let top_types: Vec<Value> = data.top_types.iter().map(Self::symbol_brief).collect();
-        let entry_points: Vec<Value> = data.entry_points.iter().map(Self::symbol_brief).collect();
+        let top_types: Vec<Value> = data.top_types.iter().map(symbol_brief).collect();
+        let entry_points: Vec<Value> = data.entry_points.iter().map(symbol_brief).collect();
 
         json!({
             "repo": data.repo_name,
@@ -62,8 +71,7 @@ impl CompactFormatter {
         .to_string()
     }
 
-    pub fn format_file_symbols(file: &str, symbols: &[SymbolRecord]) -> String {
-        // Pre-group children by parent_id for O(n) lookup
+    fn format_file_symbols(&self, file: &str, symbols: &[SymbolRecord]) -> String {
         let mut children_by_parent: HashMap<i64, Vec<&SymbolRecord>> = HashMap::new();
         for s in symbols {
             if let Some(pid) = s.parent_symbol_id {
@@ -75,10 +83,10 @@ impl CompactFormatter {
             .iter()
             .filter(|s| s.parent_symbol_id.is_none())
             .map(|s| {
-                let mut v = Self::symbol_brief(s);
+                let mut v = symbol_brief_no_file(s);
                 if let Some(children) = children_by_parent.get(&s.id) {
                     let child_values: Vec<Value> =
-                        children.iter().map(|c| Self::symbol_brief(c)).collect();
+                        children.iter().map(|c| symbol_brief_no_file(c)).collect();
                     v.as_object_mut()
                         .unwrap()
                         .insert("children".to_string(), json!(child_values));
@@ -90,7 +98,8 @@ impl CompactFormatter {
         json!({"f": file, "syms": syms}).to_string()
     }
 
-    pub fn format_symbol_detail(
+    fn format_symbol_detail(
+        &self,
         sym: &SymbolRecord,
         calls: &[RefRecord],
         called_by: &[RefRecord],
@@ -127,6 +136,7 @@ impl CompactFormatter {
         }
 
         if !called_by.is_empty() {
+            let mut path_index = PathIndex::new();
             obj["called_by"] = json!(
                 called_by
                     .iter()
@@ -137,7 +147,7 @@ impl CompactFormatter {
                             v["from_n"] = json!(n);
                         }
                         if let Some(f) = &r.from_file {
-                            v["from_f"] = json!(f);
+                            v["fi"] = json!(path_index.index(f));
                         }
                         v["kind"] = json!(r.ref_kind);
                         if let Some(l) = r.line {
@@ -147,6 +157,16 @@ impl CompactFormatter {
                     })
                     .collect::<Vec<_>>()
             );
+            if path_index.len() > 1 {
+                obj["_f"] = json!(path_index.into_list());
+            } else if let Some(only) = path_index.into_list().into_iter().next() {
+                if let Some(called_by_arr) = obj["called_by"].as_array_mut() {
+                    for item in called_by_arr {
+                        item.as_object_mut().unwrap().remove("fi");
+                        item["from_f"] = json!(only);
+                    }
+                }
+            }
         }
 
         if !type_refs.is_empty() {
@@ -169,7 +189,9 @@ impl CompactFormatter {
         obj.to_string()
     }
 
-    pub fn format_search_results(query: &str, hits: &[SearchHit]) -> String {
+    fn format_search_results(&self, query: &str, hits: &[SearchHit]) -> String {
+        let mut path_index = PathIndex::new();
+
         let results: Vec<Value> = hits
             .iter()
             .map(|h| {
@@ -177,20 +199,34 @@ impl CompactFormatter {
                     "id": h.id,
                     "n": h.name,
                     "k": h.kind,
-                    "f": h.file_rel_path,
+                    "fi": path_index.index(&h.file_rel_path),
                     "l": format!("{}-{}", h.start_line, h.end_line),
                 });
                 if let Some(sig) = &h.signature {
-                    v["sig"] = json!(sig);
+                    v["sig"] = json!(normalize_signature(sig));
                 }
                 v
             })
             .collect();
 
-        json!({"q": query, "hits": results}).to_string()
+        let mut obj = json!({"q": query, "hits": results});
+        if path_index.len() > 1 {
+            obj["_f"] = json!(path_index.into_list());
+        } else if let Some(only) = path_index.into_list().into_iter().next() {
+            if let Some(arr) = obj["hits"].as_array_mut() {
+                for item in arr {
+                    item.as_object_mut().unwrap().remove("fi");
+                    item["f"] = json!(only);
+                }
+            }
+        }
+
+        obj.to_string()
     }
 
-    pub fn format_references(symbol_id: i64, refs: &[RefRecord]) -> String {
+    fn format_references(&self, symbol_id: i64, refs: &[RefRecord]) -> String {
+        let mut path_index = PathIndex::new();
+
         let results: Vec<Value> = refs
             .iter()
             .map(|r| {
@@ -202,7 +238,7 @@ impl CompactFormatter {
                     v["from_n"] = json!(n);
                 }
                 if let Some(f) = &r.from_file {
-                    v["from_f"] = json!(f);
+                    v["fi"] = json!(path_index.index(f));
                 }
                 if let Some(l) = r.line {
                     v["line"] = json!(l);
@@ -211,10 +247,22 @@ impl CompactFormatter {
             })
             .collect();
 
-        json!({"id": symbol_id, "refs_to": results}).to_string()
+        let mut obj = json!({"id": symbol_id, "refs_to": results});
+        if path_index.len() > 1 {
+            obj["_f"] = json!(path_index.into_list());
+        } else if let Some(only) = path_index.into_list().into_iter().next() {
+            if let Some(arr) = obj["refs_to"].as_array_mut() {
+                for item in arr {
+                    item.as_object_mut().unwrap().remove("fi");
+                    item["from_f"] = json!(only);
+                }
+            }
+        }
+
+        obj.to_string()
     }
 
-    pub fn format_dependencies(symbol_id: i64, deps: &[RefRecord]) -> String {
+    fn format_dependencies(&self, symbol_id: i64, deps: &[RefRecord]) -> String {
         let results: Vec<Value> = deps
             .iter()
             .map(|r| {
@@ -231,7 +279,7 @@ impl CompactFormatter {
         json!({"id": symbol_id, "deps": results}).to_string()
     }
 
-    pub fn format_index_status(status: &IndexStatus) -> String {
+    fn format_index_status(&self, status: &IndexStatus) -> String {
         let mut obj = json!({
             "repo": status.repo_path,
             "files": status.total_files,
@@ -263,21 +311,197 @@ impl CompactFormatter {
 
         obj.to_string()
     }
+}
 
-    fn symbol_brief(s: &SymbolRecord) -> Value {
-        let mut v = json!({
-            "id": s.id,
-            "n": s.name,
-            "k": s.kind,
-            "f": s.file_rel_path,
-            "l": format!("{}-{}", s.start_line, s.end_line),
-        });
-        if let Some(sig) = &s.signature {
-            v["sig"] = json!(sig);
+// ── Shared helpers ──
+
+fn symbol_brief(s: &SymbolRecord) -> Value {
+    let mut v = json!({
+        "id": s.id,
+        "n": s.name,
+        "k": s.kind,
+        "f": s.file_rel_path,
+        "l": format!("{}-{}", s.start_line, s.end_line),
+    });
+    if let Some(sig) = &s.signature {
+        v["sig"] = json!(normalize_signature(sig));
+    }
+    if let Some(doc) = &s.doc_comment {
+        v["doc"] = json!(truncate_doc(doc));
+    }
+    v
+}
+
+fn symbol_brief_no_file(s: &SymbolRecord) -> Value {
+    let mut v = json!({
+        "id": s.id,
+        "n": s.name,
+        "k": s.kind,
+        "l": format!("{}-{}", s.start_line, s.end_line),
+    });
+    if let Some(sig) = &s.signature {
+        v["sig"] = json!(normalize_signature(sig));
+    }
+    if let Some(doc) = &s.doc_comment {
+        v["doc"] = json!(truncate_doc(doc));
+    }
+    v
+}
+
+// ── Path deduplication ──
+
+struct PathIndex {
+    paths: Vec<String>,
+    index_map: HashMap<String, usize>,
+}
+
+impl PathIndex {
+    fn new() -> Self {
+        Self {
+            paths: Vec::new(),
+            index_map: HashMap::new(),
         }
-        if let Some(doc) = &s.doc_comment {
-            v["doc"] = json!(doc);
+    }
+
+    fn index(&mut self, path: &str) -> usize {
+        if let Some(&idx) = self.index_map.get(path) {
+            return idx;
         }
-        v
+        let idx = self.paths.len();
+        self.paths.push(path.to_string());
+        self.index_map.insert(path.to_string(), idx);
+        idx
+    }
+
+    fn len(&self) -> usize {
+        self.paths.len()
+    }
+
+    fn into_list(self) -> Vec<String> {
+        self.paths
+    }
+}
+
+// ── Signature normalization ──
+
+fn normalize_signature(sig: &str) -> String {
+    let mut result = String::with_capacity(sig.len());
+    let mut pending_space = false;
+
+    for c in sig.chars() {
+        if c.is_whitespace() {
+            if !result.is_empty() {
+                pending_space = true;
+            }
+            continue;
+        }
+
+        if pending_space {
+            pending_space = false;
+            let last = result.chars().last().unwrap();
+            let drop_after = matches!(last, '(' | '[' | '{' | '<' | ':' | ',');
+            let drop_before = matches!(c, ')' | ']' | '}' | '>' | ':' | ',');
+            if !drop_after && !drop_before {
+                result.push(' ');
+            }
+        }
+        result.push(c);
+    }
+
+    if result.len() > MAX_SIG_LEN {
+        let truncated = &result[..MAX_SIG_LEN];
+        if let Some(pos) = truncated.rfind([',', ')', '>']) {
+            return format!("{}...", &truncated[..=pos]);
+        }
+        return format!("{truncated}...");
+    }
+
+    result
+}
+
+// ── Doc comment truncation ──
+
+fn truncate_doc(doc: &str) -> String {
+    let trimmed = doc.trim();
+
+    if let Some(dot_pos) = trimmed.find(". ") {
+        let first_sentence = &trimmed[..=dot_pos];
+        if first_sentence.len() <= MAX_DOC_BRIEF_LEN {
+            return first_sentence.to_string();
+        }
+    }
+
+    if let Some(nl_pos) = trimmed.find('\n') {
+        let first_line = trimmed[..nl_pos].trim();
+        if first_line.len() <= MAX_DOC_BRIEF_LEN {
+            return first_line.to_string();
+        }
+    }
+
+    if trimmed.len() <= MAX_DOC_BRIEF_LEN {
+        return trimmed.to_string();
+    }
+
+    let truncated = &trimmed[..MAX_DOC_BRIEF_LEN];
+    if let Some(space_pos) = truncated.rfind(' ') {
+        return format!("{}...", &truncated[..space_pos]);
+    }
+
+    format!("{truncated}...")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_normalize_signature_strips_whitespace() {
+        let sig = "(a: number, b: number): number";
+        let result = normalize_signature(sig);
+        assert_eq!(result, "(a:number,b:number):number");
+    }
+
+    #[test]
+    fn test_normalize_signature_preserves_ident_spaces() {
+        let sig = "fn add(a int, b int) int";
+        let result = normalize_signature(sig);
+        assert_eq!(result, "fn add(a int,b int) int");
+    }
+
+    #[test]
+    fn test_normalize_signature_truncates() {
+        let sig = "a".repeat(200);
+        let result = normalize_signature(&sig);
+        assert!(result.len() <= MAX_SIG_LEN + 3);
+        assert!(result.ends_with("..."));
+    }
+
+    #[test]
+    fn test_truncate_doc_first_sentence() {
+        let doc = "Adds two numbers. Returns the sum.";
+        assert_eq!(truncate_doc(doc), "Adds two numbers.");
+    }
+
+    #[test]
+    fn test_truncate_doc_short() {
+        let doc = "Simple doc";
+        assert_eq!(truncate_doc(doc), "Simple doc");
+    }
+
+    #[test]
+    fn test_truncate_doc_long() {
+        let doc = "a ".repeat(100);
+        let result = truncate_doc(&doc);
+        assert!(result.len() <= MAX_DOC_BRIEF_LEN + 3);
+        assert!(result.ends_with("..."));
+    }
+
+    #[test]
+    fn test_path_index_deduplication() {
+        let mut pi = PathIndex::new();
+        assert_eq!(pi.index("src/a.rs"), 0);
+        assert_eq!(pi.index("src/b.rs"), 1);
+        assert_eq!(pi.index("src/a.rs"), 0);
+        assert_eq!(pi.len(), 2);
     }
 }

@@ -1,3 +1,4 @@
+pub mod config_cmd;
 pub mod install;
 pub mod permissions;
 pub mod perms;
