@@ -61,6 +61,7 @@ pub enum SymbolKind {
     Const,
     Var,
     Impl,
+    Section,
 }
 
 impl SymbolKind {
@@ -78,6 +79,7 @@ impl SymbolKind {
             Self::Const => "const",
             Self::Var => "var",
             Self::Impl => "impl",
+            Self::Section => "section",
         }
     }
 }
@@ -141,7 +143,13 @@ impl Default for Indexer {
 impl Indexer {
     pub fn new() -> Self {
         Self {
-            extractors: vec![Box::new(languages::typescript::TypeScriptExtractor)],
+            extractors: vec![
+                Box::new(languages::typescript::TypeScriptExtractor),
+                Box::new(languages::python::PythonExtractor),
+                Box::new(languages::rust_lang::RustExtractor),
+                Box::new(languages::ruby::RubyExtractor),
+                Box::new(languages::markdown::MarkdownExtractor),
+            ],
         }
     }
 
