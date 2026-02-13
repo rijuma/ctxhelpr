@@ -2,33 +2,48 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.0.2] - 2026-02-12
+## [1.1.0] - 2026-02-13
 
 ### Bug Fixes
 
-- Fixed x86 apple build ([19acef0](https://github.com/rijuma/ctxhelpr/commit/19acef05ea6e990fb473003cf8a89564810189c6))
+- Tag release fix ([573cf79](https://github.com/rijuma/ctxhelpr/commit/573cf792c5f5375e74f92d36c435995230edb9de))
+- Fixed x86 apple build ([0d3393a](https://github.com/rijuma/ctxhelpr/commit/0d3393adeaa4c090a161d861f098f06dd045ce35))
+
+### Features
+
+- Dded Python, Rust, Ruby and Markdown parsing (#18)
+## New Language Extractors
+
+  Added semantic code indexing support for 4 new languages using
+  tree-sitter:
+
+  - Python — functions, classes, methods, inheritance, docstrings, type
+  hints, constants
+  - Rust — functions, structs, enums, traits, impl blocks, modules, type
+  aliases, doc comments
+  - Ruby — classes, modules, methods, singleton methods, constants,
+  require/include
+  - Markdown — heading hierarchy (H1–H6) as navigable document sections
+
+  Each extractor parses source files into a tree of symbols with
+  signatures, doc comments, and cross-references (calls,
+  imports, extends), enabling structural code navigation through the MCP
+  tools. A new Section symbol kind was added for
+  markdown headings. ([1efdf19](https://github.com/rijuma/ctxhelpr/commit/1efdf191e3bd194c17ac19bd484908df3e00a7c5))
 
 ### Miscellaneous
 
-- Improved asset name for builds ([bbe2703](https://github.com/rijuma/ctxhelpr/commit/bbe27033cd13ef6d8fd0c99072b4726416864eea))
-## [1.0.1] - 2026-02-12
-
-### Bug Fixes
-
-- Tag release fix ([77212b1](https://github.com/rijuma/ctxhelpr/commit/77212b10e3e3410c7a5be78d7cfb6b080c852b2f))
-
-### Miscellaneous
-
-- First commit ([4709814](https://github.com/rijuma/ctxhelpr/commit/4709814c96e41d3a1b477ba1596aa061969bc5a5))
-- Fix tag and build ([0eb4dd0](https://github.com/rijuma/ctxhelpr/commit/0eb4dd041ada64176e7fd2afa4731b667b6fcc1f))
+- First commit ([9cc49db](https://github.com/rijuma/ctxhelpr/commit/9cc49dba961b19149f4c16725748ce2e34b02978))
+- Fix tag and build ([c1efc91](https://github.com/rijuma/ctxhelpr/commit/c1efc9107951d60346c86982be445260198f03ef))
+- Improved asset name for builds ([18d19fc](https://github.com/rijuma/ctxhelpr/commit/18d19fc595182199fd30f92d76ca47472edf65e9))
+- Updated build jobs to match the new labels ([3a9f657](https://github.com/rijuma/ctxhelpr/commit/3a9f6579808653ee6c36ccd0f425be80f122584a))
+- Updated docs ([6873a83](https://github.com/rijuma/ctxhelpr/commit/6873a832282a02e33a6f6843e4b04e357f313697))
 
 ### Other
 
 - Add workflows (#1)
 
-Added github workflows for CI
-
-Co-authored-by: Rijuma <marcos@rigoli.dev> ([d3b9289](https://github.com/rijuma/ctxhelpr/commit/d3b928998c73ba3a1a3b57a3c448538f7b1d0f7f))
+Added github workflows for CI ([948042a](https://github.com/rijuma/ctxhelpr/commit/948042ac797eb29044bd10e4a9d47c8cb3fb3a9f))
 - Add local and global scopes and add default permission handling (#2)
 
 - Added possibility to manage two setting scopes, local and global:
@@ -36,17 +51,13 @@ Co-authored-by: Rijuma <marcos@rigoli.dev> ([d3b9289](https://github.com/rijuma/
 locally.
 - The global scope enables the indexing and the skill to Claude
 globally.
-- Added prompting to handle new options and flags to skip the prompting.
-
-Co-authored-by: Rijuma <marcos@rigoli.dev> ([98275ed](https://github.com/rijuma/ctxhelpr/commit/98275edcc7789be06cdf76117929cc2e33d58f52))
+- Added prompting to handle new options and flags to skip the prompting. ([d2c6633](https://github.com/rijuma/ctxhelpr/commit/d2c66336ea8218e42101780aead2250b368a5f25))
 - Rename setup for install and added release workflows (#3)
 
 - Renamed the `setup` command to `install`, to be more clear and aligned
 with the opposite `uninstall` we are already using.
 - Added changelog logic, tag actions and release build workflows.
-- Updated docs.
-
-Co-authored-by: Rijuma <=> ([498c2c5](https://github.com/rijuma/ctxhelpr/commit/498c2c540c956b6dbacc999a3ad97f705c9e09e8))
+- Updated docs. ([bb9490b](https://github.com/rijuma/ctxhelpr/commit/bb9490bdd684a2b9531a0a9c9bc0030b1774b9ec))
 - Update workflows and docs (#4)
 
 - Updated release workflow as follows:
@@ -58,19 +69,13 @@ release with the available downloads.
 3. The release is not set as "latest", so after confirming everything
 works as intended, we should open the release and flag it as "latest".
 - Updated documentation to be more user-oriented, rather than
-collaborator-oriented.
-
-Co-authored-by: Rijuma <=> ([ff45a2f](https://github.com/rijuma/ctxhelpr/commit/ff45a2fb394064c3148f79d844356dcbeecc6f0a))
+collaborator-oriented. ([cf07395](https://github.com/rijuma/ctxhelpr/commit/cf0739588029b7098ec878d8f35262ea0a533c7c))
 - Improve release workflow (#5)
 
-- Split release workflow to be more efficient.
-
-Co-authored-by: Rijuma <=> ([c14bd23](https://github.com/rijuma/ctxhelpr/commit/c14bd23262289989c9dc6b192e69c8ffcd725ad0))
+- Split release workflow to be more efficient. ([0cf1993](https://github.com/rijuma/ctxhelpr/commit/0cf199347fa0aa45bbca1df8a68b3736399b582a))
 - Fixed release workflow (#7)
 
-- Updated PR content and fixed CI workflows never starting.
-
-Co-authored-by: Rijuma <=> ([b93fed1](https://github.com/rijuma/ctxhelpr/commit/b93fed1993a2b04adcc3ae9b963d0e20a0ec5f8c))
+- Updated PR content and fixed CI workflows never starting. ([7824095](https://github.com/rijuma/ctxhelpr/commit/7824095b540c06f6701327087a9fd2714f31b0af))
 - Fix release workflow (#11)
 
 ## Summary
@@ -80,14 +85,10 @@ permission issue ("Resource not accessible by integration")
 it
 - Add resilience for re-runs: delete pre-existing remote branch before
 push
-- Improve PR description with actual changelog content
-
-Co-authored-by: Rijuma <=> ([3233097](https://github.com/rijuma/ctxhelpr/commit/3233097f2d92a89dc077e3dd62ab58f2dc5591b0))
+- Improve PR description with actual changelog content ([0e6fca6](https://github.com/rijuma/ctxhelpr/commit/0e6fca60c7856844b63de111b422be5f26345034))
 - Updated release workflow to use personal tokens instead (#13)
 
-Updated release workflow to use personal tokens instead
-
-Co-authored-by: Rijuma <=> ([cbdd6fc](https://github.com/rijuma/ctxhelpr/commit/cbdd6fc95a20c056bc2ac6948a70258c9b00fdbc))
+Updated release workflow to use personal tokens instead ([07bc073](https://github.com/rijuma/ctxhelpr/commit/07bc073f41995adebdf7142e02628e110c63cd4f))
 - Confirm new release v0.2.0 (#14)
 
 ## Release v0.2.0
@@ -101,7 +102,7 @@ Bumps version from 0.1.0 to 0.2.0 (minor).
 ### Miscellaneous
 
 - First commit
-([4709814](https://github.com/rijuma/ctxhelpr/commit/4709814c96e41d3a1b477ba1596aa061969bc5a5))
+([9cc49db](https://github.com/rijuma/ctxhelpr/commit/9cc49dba961b19149f4c16725748ce2e34b02978))
 
 ### Other
 
@@ -109,8 +110,7 @@ Bumps version from 0.1.0 to 0.2.0 (minor).
 
 Added github workflows for CI
 
-Co-authored-by: Rijuma <marcos@rigoli.dev>
-([d3b9289](https://github.com/rijuma/ctxhelpr/commit/d3b928998c73ba3a1a3b57a3c448538f7b1d0f7f))
+([948042a](https://github.com/rijuma/ctxhelpr/commit/948042ac797eb29044bd10e4a9d47c8cb3fb3a9f))
 - Add local and global scopes and add default permission handling (#2)
 
 - Added possibility to manage two setting scopes, local and global:
@@ -120,8 +120,7 @@ locally.
 globally.
 - Added prompting to handle new options and flags to skip the prompting.
 
-Co-authored-by: Rijuma <marcos@rigoli.dev>
-([98275ed](https://github.com/rijuma/ctxhelpr/commit/98275edcc7789be06cdf76117929cc2e33d58f52))
+([d2c6633](https://github.com/rijuma/ctxhelpr/commit/d2c66336ea8218e42101780aead2250b368a5f25))
 - Rename setup for install and added release workflows (#3)
 
 - Renamed the `setup` command to `install`, to be more clear and aligned
@@ -129,8 +128,7 @@ with the opposite `uninstall` we are already using.
 - Added changelog logic, tag actions and release build workflows.
 - Updated docs.
 
-Co-authored-by: Rijuma <=>
-([498c2c5](https://github.com/rijuma/ctxhelpr/commit/498c2c540c956b6dbacc999a3ad97f705c9e09e8))
+([bb9490b](https://github.com/rijuma/ctxhelpr/commit/bb9490bdd684a2b9531a0a9c9bc0030b1774b9ec))
 - Update workflows and docs (#4)
 
 - Updated release workflow as follows:
@@ -144,20 +142,17 @@ works as intended, we should open the release and flag it as "latest".
 - Updated documentation to be more user-oriented, rather than
 collaborator-oriented.
 
-Co-authored-by: Rijuma <=>
-([ff45a2f](https://github.com/rijuma/ctxhelpr/commit/ff45a2fb394064c3148f79d844356dcbeecc6f0a))
+([cf07395](https://github.com/rijuma/ctxhelpr/commit/cf0739588029b7098ec878d8f35262ea0a533c7c))
 - Improve release workflow (#5)
 
 - Split release workflow to be more efficient.
 
-Co-authored-by: Rijuma <=>
-([c14bd23](https://github.com/rijuma/ctxhelpr/commit/c14bd23262289989c9dc6b192e69c8ffcd725ad0))
+([0cf1993](https://github.com/rijuma/ctxhelpr/commit/0cf199347fa0aa45bbca1df8a68b3736399b582a))
 - Fixed release workflow (#7)
 
 - Updated PR content and fixed CI workflows never starting.
 
-Co-authored-by: Rijuma <=>
-([b93fed1](https://github.com/rijuma/ctxhelpr/commit/b93fed1993a2b04adcc3ae9b963d0e20a0ec5f8c))
+([7824095](https://github.com/rijuma/ctxhelpr/commit/7824095b540c06f6701327087a9fd2714f31b0af))
 - Fix release workflow (#11)
 
 ## Summary
@@ -169,21 +164,12 @@ it
 push
 - Improve PR description with actual changelog content
 
-Co-authored-by: Rijuma <=>
-([3233097](https://github.com/rijuma/ctxhelpr/commit/3233097f2d92a89dc077e3dd62ab58f2dc5591b0))
+([0e6fca6](https://github.com/rijuma/ctxhelpr/commit/0e6fca60c7856844b63de111b422be5f26345034))
 - Updated release workflow to use personal tokens instead (#13)
 
 Updated release workflow to use personal tokens instead
 
-Co-authored-by: Rijuma <=>
-([cbdd6fc](https://github.com/rijuma/ctxhelpr/commit/cbdd6fc95a20c056bc2ac6948a70258c9b00fdbc))
-
-
----
-**When this PR is merged**, a `v0.2.0` tag is automatically created,
-release builds are triggered, and a GitHub release is published.
-
-Co-authored-by: github-actions[bot] <github-actions[bot]@users.noreply.github.com> ([7452658](https://github.com/rijuma/ctxhelpr/commit/7452658b04e2f4af76db2fb6501e7413731e3468))
+([07bc073](https://github.com/rijuma/ctxhelpr/commit/07bc073f41995adebdf7142e02628e110c63cd4f)) ([1a99949](https://github.com/rijuma/ctxhelpr/commit/1a99949816b3bd4d74bfcb759cace15856c5fbdd))
 - Confirm new release v1.0.0 (#15)
 
 ## Release v1.0.0
@@ -197,14 +183,7 @@ Bumps version from 0.2.0 to 1.0.0 (major).
 ### Bug Fixes
 
 - Tag release fix
-([77212b1](https://github.com/rijuma/ctxhelpr/commit/77212b10e3e3410c7a5be78d7cfb6b080c852b2f))
-
-
----
-**When this PR is merged**, a `v1.0.0` tag is automatically created,
-release builds are triggered, and a GitHub release is published.
-
-Co-authored-by: github-actions[bot] <github-actions[bot]@users.noreply.github.com> ([eb20434](https://github.com/rijuma/ctxhelpr/commit/eb2043411f9774b77ab4184f8f088677822b59e0))
+([573cf79](https://github.com/rijuma/ctxhelpr/commit/573cf792c5f5375e74f92d36c435995230edb9de)) ([e789a63](https://github.com/rijuma/ctxhelpr/commit/e789a63f344cb19ed126680e9897d87e40ff3975))
 - Confirm new release v1.0.1 (#16)
 
 ## Release v1.0.1
@@ -218,12 +197,84 @@ Bumps version from 1.0.0 to 1.0.1 (patch).
 ### Miscellaneous
 
 - Fix tag and build
-([0eb4dd0](https://github.com/rijuma/ctxhelpr/commit/0eb4dd041ada64176e7fd2afa4731b667b6fcc1f))
+([c1efc91](https://github.com/rijuma/ctxhelpr/commit/c1efc9107951d60346c86982be445260198f03ef)) ([e5f02dd](https://github.com/rijuma/ctxhelpr/commit/e5f02ddd34a0519d625c03e918d6467e0ecbbb84))
+- Confirm new release v1.0.2 (#17)
 
+## Release v1.0.2
 
----
-**When this PR is merged**, a `v1.0.1` tag is automatically created,
-release builds are triggered, and a GitHub release is published.
+Bumps version from 1.0.1 to 1.0.2 (patch).
 
-Co-authored-by: github-actions[bot] <github-actions[bot]@users.noreply.github.com> ([cc53886](https://github.com/rijuma/ctxhelpr/commit/cc5388636350f48eccb78b926f8d770338147a6b))
+### Changelog
+
+## [1.0.2] - 2026-02-12
+
+### Bug Fixes
+
+- Fixed x86 apple build
+([0d3393a](https://github.com/rijuma/ctxhelpr/commit/0d3393adeaa4c090a161d861f098f06dd045ce35))
+
+### Miscellaneous
+
+- Improved asset name for builds
+([18d19fc](https://github.com/rijuma/ctxhelpr/commit/18d19fc595182199fd30f92d76ca47472edf65e9)) ([216ae32](https://github.com/rijuma/ctxhelpr/commit/216ae32299bec170637948140b4aad21e46755d4))
+- Added config options and updated incexing logic (#19)
+
+# Summary
+
+- TOML → JSON: Project config file is now .ctxhelpr.json instead of
+.ctxhelpr.toml, aligning with the MCP ecosystem (JSON everywhere) and
+removing the
+Rust-centric TOML dependency
+- Config CLI: New ctxhelpr config subcommand with init, validate, and
+show actions so users can scaffold, check, and inspect their
+configuration without
+guessing
+- No more silent failures: Config parse errors are now logged as
+warnings instead of silently falling back to defaults. Unknown fields
+are rejected
+(deny_unknown_fields) to catch typos early
+
+##  Why
+
+Two problems with the old system:
+
+1. .ctxhelpr.toml was a Rust-ism. ctxhelpr targets all languages and
+lives in the MCP ecosystem where JSON is the standard config format
+(settings.json,
+mcp.json, etc.). TOML created unnecessary friction for non-Rust users.
+2. ConfigCache::get() used unwrap_or_default(), meaning a user with a
+typo in their config would silently get default behavior with zero
+indication
+anything was wrong. No way to validate a config file without reading
+source code.
+
+##  What changed
+
+Config parser — Switched from toml::from_str to serde_json::from_str.
+Introduced a ConfigError enum (NotFound / InvalidJson / IoError) so
+callers get
+structured errors with line/column info from serde_json. Added
+Config::validate() for explicit validation (returns NotFound when no
+file exists, unlike
+load() which returns defaults). All config structs now have
+#[serde(deny_unknown_fields)] and derive Serialize for JSON output.
+
+Error handling — ConfigCache::get() now uses tracing::warn! on parse
+failures instead of silently defaulting. Errors surface in MCP server
+logs at warn
+level.
+
+CLI tooling — ctxhelpr config init scaffolds a .ctxhelpr.json with all
+defaults filled in. ctxhelpr config validate [--path] checks file
+existence, JSON
+syntax, and schema validity, reporting specific errors. ctxhelpr config
+show [--path] prints the resolved config (defaults merged with user
+overrides).
+
+Dependency cleanup — Removed the toml crate. serde_json was already a
+dependency.
+
+Documentation — Both READMEs (EN/ES) and docs/indexing-strategy.md
+updated: TOML references → JSON, added config CLI docs, added field
+reference table. ([0fbd7b5](https://github.com/rijuma/ctxhelpr/commit/0fbd7b55e60057c9caaf47e13f7bb09e2d3214e8))
 
