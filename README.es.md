@@ -24,7 +24,7 @@ Si encontrás problemas, tenés sugerencias o querés compartir tu experiencia, 
 
 1. **Indexa tu repo** usando [tree-sitter](https://tree-sitter.github.io/) para extraer símbolos, sus relaciones y documentación
 2. **Almacena todo** en una base de datos SQLite por repositorio con búsqueda full-text FTS5
-3. **Expone 9 herramientas MCP** que Claude Code usa para navegar tu código semánticamente
+3. **Expone 11 herramientas MCP** que Claude Code usa para navegar y gestionar el índice de tu código
 4. **Re-indexación incremental** - solo re-parsea archivos que realmente cambiaron (hashing SHA256 del contenido)
 
 ### Herramientas MCP
@@ -40,6 +40,8 @@ Si encontrás problemas, tenés sugerencias o querés compartir tu experiencia, 
 | `get_references`    | Quién referencia un símbolo dado                                          |
 | `get_dependencies`  | De qué depende un símbolo                                                 |
 | `index_status`      | Verificar frescura del índice y detectar archivos desactualizados         |
+| `list_repos`        | Listar todos los repositorios indexados con estadísticas                  |
+| `delete_repos`      | Eliminar datos de índice de los repositorios especificados                |
 
 ## Soporte de lenguajes
 
@@ -104,7 +106,7 @@ Registra el servidor MCP, instala el archivo de skill y el comando `/index`, ofr
 ctxhelpr uninstall [-l | -g]
 ```
 
-Elimina todas las integraciones y revoca permisos de herramientas.
+Elimina todas las integraciones y revoca permisos de herramientas. Ofrece eliminar las bases de datos de índice: la desinstalación local ofrece eliminar la DB del repo actual (por defecto: sí), la global ofrece eliminar todas las DBs (por defecto: no).
 
 ### Gestionar permisos
 
@@ -199,6 +201,8 @@ ctxhelpr perms [-l | -g] [-a | -r]          # Gestionar permisos
 ctxhelpr config init                        # Crear template .ctxhelpr.json
 ctxhelpr config validate [--path dir]       # Validar archivo de configuración
 ctxhelpr config show [--path dir]           # Mostrar configuración resuelta
+ctxhelpr repos list                         # Listar todos los repositorios indexados
+ctxhelpr repos delete [paths...]            # Eliminar datos de índice (interactivo si no se dan paths)
 ```
 
 `serve` no está pensado para ejecutarse manualmente. Claude Code lo inicia vía stdio; se detiene automáticamente cuando la sesión termina.
@@ -229,7 +233,7 @@ cargo build --release
 src/
 ├── main.rs                 # Punto de entrada del CLI
 ├── config.rs               # Configuración por proyecto (.ctxhelpr.json)
-├── cli/                    # Comandos install, uninstall, perms y permissions
+├── cli/                    # Comandos install, uninstall, perms, permissions y repos
 ├── server/                 # Servidor MCP (transporte stdio)
 ├── mcp/                    # Definiciones y handlers de herramientas
 ├── indexer/                # Lógica de indexación + extractores por lenguaje
