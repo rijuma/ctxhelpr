@@ -31,7 +31,9 @@ fn index_lang_fixtures(path: PathBuf) -> (SqliteStorage, String) {
     let storage = SqliteStorage::open_memory().expect("Failed to create in-memory DB");
     let path_str = path.to_str().unwrap().to_string();
     let indexer = Indexer::new();
-    let stats = indexer.index(&path_str, &storage).expect("Indexing failed");
+    let stats = indexer
+        .index(&path_str, &storage, &[])
+        .expect("Indexing failed");
     assert!(stats.files_total > 0, "No files were processed");
     assert!(stats.symbols_count > 0, "No symbols were extracted");
     (storage, path_str)
@@ -42,7 +44,9 @@ fn index_fixtures() -> (SqliteStorage, String) {
     let path = fixtures_path();
     let path_str = path.to_str().unwrap().to_string();
     let indexer = Indexer::new();
-    let stats = indexer.index(&path_str, &storage).expect("Indexing failed");
+    let stats = indexer
+        .index(&path_str, &storage, &[])
+        .expect("Indexing failed");
     assert!(stats.files_total > 0, "No files were processed");
     assert!(stats.symbols_count > 0, "No symbols were extracted");
     (storage, path_str)
@@ -55,7 +59,9 @@ fn test_index_repository() {
     let storage = SqliteStorage::open_memory().expect("Failed to create in-memory DB");
     let indexer = Indexer::new();
 
-    let stats = indexer.index(path_str, &storage).expect("Indexing failed");
+    let stats = indexer
+        .index(path_str, &storage, &[])
+        .expect("Indexing failed");
 
     assert_eq!(stats.files_total, 4, "Should index 4 TypeScript files");
     assert!(stats.symbols_count > 10, "Should extract multiple symbols");
@@ -72,13 +78,13 @@ fn test_incremental_reindex() {
 
     // First index
     let stats1 = indexer
-        .index(path_str, &storage)
+        .index(path_str, &storage, &[])
         .expect("First index failed");
     assert!(stats1.files_total > 0);
 
     // Second index - same files, nothing changed
     let stats2 = indexer
-        .index(path_str, &storage)
+        .index(path_str, &storage, &[])
         .expect("Second index failed");
     assert_eq!(
         stats2.files_unchanged, stats1.files_total,
@@ -331,7 +337,8 @@ fn test_compact_output() {
     let overview = storage
         .get_overview(&path_str)
         .expect("get_overview failed");
-    let output = ctxhelpr::output::CompactFormatter::format_overview(&overview);
+    let fmt = ctxhelpr::output::CompactFormatter;
+    let output = ctxhelpr::output::OutputFormatter::format_overview(&fmt, &overview);
 
     // Should be valid JSON
     let parsed: serde_json::Value =
@@ -358,7 +365,9 @@ fn test_file_symbols_compact_output() {
     let symbols = storage
         .get_file_symbols(&path_str, "simple.ts")
         .expect("get_file_symbols failed");
-    let output = ctxhelpr::output::CompactFormatter::format_file_symbols("simple.ts", &symbols);
+    let fmt = ctxhelpr::output::CompactFormatter;
+    let output =
+        ctxhelpr::output::OutputFormatter::format_file_symbols(&fmt, "simple.ts", &symbols);
 
     let parsed: serde_json::Value =
         serde_json::from_str(&output).expect("File symbols output should be valid JSON");
@@ -387,7 +396,7 @@ fn test_update_files() {
     let (storage, path_str) = index_fixtures();
 
     let stats = Indexer::new()
-        .update_files(&path_str, &["simple.ts".to_string()], &storage)
+        .update_files(&path_str, &["simple.ts".to_string()], &storage, &[])
         .expect("update_files failed");
 
     assert_eq!(stats.files_changed, 1, "Should update 1 file");
@@ -399,7 +408,12 @@ fn test_update_files_nonexistent_file() {
     let (storage, path_str) = index_fixtures();
 
     let stats = Indexer::new()
-        .update_files(&path_str, &["nonexistent_file.ts".to_string()], &storage)
+        .update_files(
+            &path_str,
+            &["nonexistent_file.ts".to_string()],
+            &storage,
+            &[],
+        )
         .expect("update_files should handle missing files gracefully");
 
     assert_eq!(stats.files_changed, 0, "No files should be updated");
@@ -414,7 +428,7 @@ fn test_index_empty_directory() {
     let indexer = Indexer::new();
 
     let stats = indexer
-        .index(path_str, &storage)
+        .index(path_str, &storage, &[])
         .expect("Indexing empty dir failed");
 
     assert_eq!(stats.files_total, 0, "No files in empty dir");
@@ -477,7 +491,9 @@ fn test_python_index_repository() {
     let storage = SqliteStorage::open_memory().expect("Failed to create in-memory DB");
     let indexer = Indexer::new();
 
-    let stats = indexer.index(path_str, &storage).expect("Indexing failed");
+    let stats = indexer
+        .index(path_str, &storage, &[])
+        .expect("Indexing failed");
 
     assert_eq!(stats.files_total, 1, "Should index 1 Python file");
     assert!(stats.symbols_count > 0, "Should extract symbols");
@@ -601,7 +617,9 @@ fn test_rust_index_repository() {
     let storage = SqliteStorage::open_memory().expect("Failed to create in-memory DB");
     let indexer = Indexer::new();
 
-    let stats = indexer.index(path_str, &storage).expect("Indexing failed");
+    let stats = indexer
+        .index(path_str, &storage, &[])
+        .expect("Indexing failed");
 
     assert_eq!(stats.files_total, 1, "Should index 1 Rust file");
     assert!(stats.symbols_count > 0, "Should extract symbols");
@@ -782,7 +800,9 @@ fn test_ruby_index_repository() {
     let storage = SqliteStorage::open_memory().expect("Failed to create in-memory DB");
     let indexer = Indexer::new();
 
-    let stats = indexer.index(path_str, &storage).expect("Indexing failed");
+    let stats = indexer
+        .index(path_str, &storage, &[])
+        .expect("Indexing failed");
 
     assert_eq!(stats.files_total, 1, "Should index 1 Ruby file");
     assert!(stats.symbols_count > 0, "Should extract symbols");
@@ -896,6 +916,74 @@ fn test_ruby_constants() {
     );
 }
 
+// ==================== Code-Aware Search Tests ====================
+
+#[test]
+fn test_search_camel_case_subword() {
+    let (storage, path_str) = index_fixtures();
+
+    // "getUserById" should be found when searching for "user"
+    let results = storage
+        .search_symbols(&path_str, "user")
+        .expect("search failed");
+    let names: Vec<&str> = results.iter().map(|r| r.name.as_str()).collect();
+    assert!(
+        names
+            .iter()
+            .any(|n| n.contains("User") || n.contains("user")),
+        "Searching 'user' should find camelCase/PascalCase symbols containing 'user', got: {:?}",
+        names
+    );
+}
+
+#[test]
+fn test_search_finds_pascal_case_class() {
+    let (storage, path_str) = index_fixtures();
+
+    // Searching for "repository" should find "UserRepository" and "AdminUserRepository"
+    let results = storage
+        .search_symbols(&path_str, "repository")
+        .expect("search failed");
+    let names: Vec<&str> = results.iter().map(|r| r.name.as_str()).collect();
+    assert!(
+        names.contains(&"UserRepository"),
+        "Searching 'repository' should find 'UserRepository', got: {:?}",
+        names
+    );
+}
+
+#[test]
+fn test_search_finds_snake_case_parts() {
+    let (storage, path_str) = index_lang_fixtures(python_fixtures_path());
+
+    // Searching for "retries" should find "MAX_RETRIES"
+    let results = storage
+        .search_symbols(&path_str, "retries")
+        .expect("search failed");
+    let names: Vec<&str> = results.iter().map(|r| r.name.as_str()).collect();
+    assert!(
+        names.contains(&"MAX_RETRIES"),
+        "Searching 'retries' should find 'MAX_RETRIES', got: {:?}",
+        names
+    );
+}
+
+#[test]
+fn test_search_prefix_on_subwords() {
+    let (storage, path_str) = index_fixtures();
+
+    // Prefix search "repo*" should find UserRepository via name_tokens
+    let results = storage
+        .search_symbols(&path_str, "repo*")
+        .expect("search failed");
+    let names: Vec<&str> = results.iter().map(|r| r.name.as_str()).collect();
+    assert!(
+        names.iter().any(|n| n.contains("Repository")),
+        "Prefix search 'repo*' should find Repository symbols, got: {:?}",
+        names
+    );
+}
+
 // ==================== Markdown Tests ====================
 
 #[test]
@@ -905,7 +993,9 @@ fn test_markdown_index_repository() {
     let storage = SqliteStorage::open_memory().expect("Failed to create in-memory DB");
     let indexer = Indexer::new();
 
-    let stats = indexer.index(path_str, &storage).expect("Indexing failed");
+    let stats = indexer
+        .index(path_str, &storage, &[])
+        .expect("Indexing failed");
 
     assert_eq!(stats.files_total, 1, "Should index 1 Markdown file");
     assert!(stats.symbols_count > 0, "Should extract sections");
@@ -971,5 +1061,63 @@ fn test_markdown_heading_hierarchy() {
         prereqs.parent_symbol_id,
         Some(installation.id),
         "H3 'Prerequisites' should be child of H2 'Installation'"
+    );
+}
+
+// ==================== Minified File Skipping Tests ====================
+
+#[test]
+fn test_minified_files_skipped_by_default() {
+    let path = fixtures_path();
+    let path_str = path.to_str().unwrap();
+    let storage = SqliteStorage::open_memory().expect("Failed to create in-memory DB");
+    let indexer = Indexer::new();
+
+    let stats = indexer
+        .index(path_str, &storage, &[])
+        .expect("Indexing failed");
+
+    // vendor.min.js exists in fixtures but should be skipped
+    assert_eq!(
+        stats.files_total, 4,
+        "Should index 4 files (vendor.min.js should be skipped)"
+    );
+}
+
+#[test]
+fn test_custom_ignore_patterns() {
+    let path = fixtures_path();
+    let path_str = path.to_str().unwrap();
+    let storage = SqliteStorage::open_memory().expect("Failed to create in-memory DB");
+    let indexer = Indexer::new();
+
+    let ignore = vec!["*.ts".to_string()];
+    let stats = indexer
+        .index(path_str, &storage, &ignore)
+        .expect("Indexing failed");
+
+    // All .ts files should be ignored, only .min.js remains (which is also skipped by default)
+    assert_eq!(
+        stats.files_total, 0,
+        "All .ts files should be ignored by custom pattern"
+    );
+}
+
+#[test]
+fn test_update_files_skips_ignored() {
+    let (storage, path_str) = index_fixtures();
+
+    let stats = Indexer::new()
+        .update_files(
+            &path_str,
+            &["vendor.min.js".to_string(), "simple.ts".to_string()],
+            &storage,
+            &["*.min.js".to_string()],
+        )
+        .expect("update_files failed");
+
+    assert_eq!(
+        stats.files_changed, 1,
+        "Should update only simple.ts, not vendor.min.js"
     );
 }

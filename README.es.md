@@ -43,11 +43,11 @@ Si encontrás problemas, tenés sugerencias o querés compartir tu experiencia, 
 
 ## Soporte de lenguajes
 
-Actualmente implementado:
-
-- **TypeScript / TSX / JavaScript / JSX** - extracción completa
-
-La infraestructura está lista para Python y Rust, pero los extractores todavía no están escritos.
+- **TypeScript / TSX / JavaScript / JSX** - funciones, clases, interfaces, enums, arrow functions, referencias de llamadas
+- **Python** - funciones, clases, herencia, decoradores, docstrings, constantes
+- **Rust** - funciones, structs, enums, traits, bloques impl, módulos, type aliases, constantes
+- **Ruby** - clases, módulos, métodos, métodos singleton, herencia, constantes
+- **Markdown** - jerarquía de encabezados como secciones con relaciones padre-hijo
 
 ## Primeros pasos
 
@@ -55,13 +55,13 @@ La infraestructura está lista para Python y Rust, pero los extractores todavía
 
 Descargá la última versión para tu plataforma desde la [página de releases](https://github.com/rijuma/ctxhelpr/releases/latest).
 
-| SO      | Arquitectura  | Archivo                              |
-| ------- | ------------- | ------------------------------------ |
-| Linux   | x86_64        | `ctxhelpr-*-linux-x64.tar.gz`        |
-| Linux   | ARM64         | `ctxhelpr-*-linux-arm64.tar.gz`      |
-| macOS   | Apple Silicon | `ctxhelpr-*-macos-arm64.tar.gz`      |
-| macOS   | Intel         | `ctxhelpr-*-macos-x64.tar.gz`        |
-| Windows | x86_64        | `ctxhelpr-*-windows-x64.zip`         |
+| SO      | Arquitectura  | Archivo                         |
+| ------- | ------------- | ------------------------------- |
+| Linux   | x86_64        | `ctxhelpr-*-linux-x64.tar.gz`   |
+| Linux   | ARM64         | `ctxhelpr-*-linux-arm64.tar.gz` |
+| macOS   | Apple Silicon | `ctxhelpr-*-macos-arm64.tar.gz` |
+| macOS   | Intel         | `ctxhelpr-*-macos-x64.tar.gz`   |
+| Windows | x86_64        | `ctxhelpr-*-windows-x64.zip`    |
 
 ### Instalar el binario
 
@@ -108,14 +108,59 @@ Gestiona qué herramientas de ctxhelpr puede llamar Claude Code sin preguntar. S
 
 ## Configuración
 
-Toda la configuración es a través de variables de entorno - no se necesitan archivos de configuración.
+### Configuración por proyecto (`.ctxhelpr.json`)
 
-| Variable                   | Default                             | Descripción                          |
-| -------------------------- | ----------------------------------- | ------------------------------------ |
-| `RUST_LOG`                 | -                                   | Nivel de log (ej. `ctxhelpr=debug`)  |
-| `CTXHELPR_DB_DIR`          | `~/.cache/ctxhelpr/`                | Ubicación de la base de datos        |
-| `CTXHELPR_MAX_FILE_SIZE`   | `1048576` (1MB)                     | Omitir archivos más grandes que esto |
-| `CTXHELPR_IGNORE_PATTERNS` | `node_modules,target,.git,dist,...` | Directorios a ignorar                |
+Colocá un archivo `.ctxhelpr.json` en la raíz de tu repositorio para personalizar el comportamiento por proyecto. Todos los campos son opcionales y usan valores predeterminados sensatos.
+
+```json
+{
+  "output": {
+    "max_tokens": 2000,
+    "truncate_signatures": 120,
+    "truncate_doc_comments": 100
+  },
+  "search": {
+    "max_results": 20
+  },
+  "indexer": {
+    "ignore": ["generated/", "*.min.js"],
+    "max_file_size": 1048576
+  }
+}
+```
+
+### CLI de configuración
+
+```bash
+ctxhelpr config init                  # Crear un template .ctxhelpr.json en el directorio actual
+ctxhelpr config validate [--path dir] # Validar .ctxhelpr.json (sintaxis y esquema)
+ctxhelpr config show [--path dir]     # Mostrar configuración resuelta (defaults + overrides)
+```
+
+### Referencia de campos
+
+| Campo | Tipo | Default | Descripción |
+|-------|------|---------|-------------|
+| `output.max_tokens` | number o null | `null` | Limitar tamaño de respuesta (aproximado, 1 token ~ 4 bytes) |
+| `output.truncate_signatures` | number | `120` | Largo máximo de firma antes de truncar |
+| `output.truncate_doc_comments` | number | `100` | Largo máximo de doc comment en vistas resumidas |
+| `search.max_results` | number | `20` | Máximo de resultados de búsqueda |
+| `indexer.ignore` | string[] | `[]` | Patrones glob adicionales de rutas a ignorar |
+| `indexer.max_file_size` | number | `1048576` | Omitir archivos más grandes que esto (bytes) |
+
+### Variables de entorno
+
+| Variable   | Default | Descripción                         |
+| ---------- | ------- | ----------------------------------- |
+| `RUST_LOG` | -       | Nivel de log (ej. `ctxhelpr=debug`) |
+
+### Presupuesto de tokens
+
+Las respuestas se pueden limitar con `max_tokens` - ya sea por proyecto en `.ctxhelpr.json` o por solicitud a través del parámetro de la herramienta MCP. Cuando una respuesta excede el presupuesto, los resultados se truncan progresivamente con un marcador `"truncated": true`.
+
+### Búsqueda inteligente de código
+
+La búsqueda entiende las convenciones de nombres de código. Buscar `"user"` encuentra `getUserById`, `UserRepository` y `user_service`. Esto funciona mediante identificadores pre-tokenizados que separan camelCase, PascalCase y snake_case en los límites de palabras.
 
 ## Cómo lo usa Claude
 
@@ -138,6 +183,9 @@ ctxhelpr serve                              # Servidor MCP (usado internamente p
 ctxhelpr install [-l | -g]                  # Instalar integración
 ctxhelpr uninstall [-l | -g]                # Eliminar integración
 ctxhelpr perms [-l | -g] [-a | -r]          # Gestionar permisos
+ctxhelpr config init                        # Crear template .ctxhelpr.json
+ctxhelpr config validate [--path dir]       # Validar archivo de configuración
+ctxhelpr config show [--path dir]           # Mostrar configuración resuelta
 ```
 
 `serve` no está pensado para ejecutarse manualmente. Claude Code lo inicia vía stdio; se detiene automáticamente cuando la sesión termina.
@@ -167,15 +215,20 @@ cargo build --release
 ```text
 src/
 ├── main.rs                 # Punto de entrada del CLI
+├── config.rs               # Configuración por proyecto (.ctxhelpr.json)
 ├── cli/                    # Comandos install, uninstall, perms y permissions
 ├── server/                 # Servidor MCP (transporte stdio)
 ├── mcp/                    # Definiciones y handlers de herramientas
 ├── indexer/                # Lógica de indexación + extractores por lenguaje
-│   └── languages/          # Extractores basados en tree-sitter
-├── storage/                # Persistencia SQLite + esquema
-├── output/                 # Formateo JSON eficiente en tokens
+│   └── languages/          # Extractores basados en tree-sitter (TS, Python, Rust, Ruby, MD)
+├── storage/                # Persistencia SQLite + esquema + tokenizador de código
+├── output/                 # Formateo JSON eficiente en tokens + presupuesto
+│   ├── formatter.rs        # Trait OutputFormatter
+│   └── token_budget.rs     # Control de presupuesto de tokens
 └── assets/                 # Templates embebidos de skill y comandos
 ```
+
+Para documentación detallada sobre la arquitectura de indexación, ver [docs/indexing-strategy.md](docs/indexing-strategy.md).
 
 ### Stack tecnológico
 

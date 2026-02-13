@@ -2,6 +2,14 @@ PRAGMA journal_mode=WAL;
 PRAGMA foreign_keys=ON;
 
 -- ============================================================
+-- METADATA (schema versioning)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS metadata (
+    key     TEXT PRIMARY KEY,
+    value   TEXT
+);
+
+-- ============================================================
 -- REPOSITORIES
 -- ============================================================
 CREATE TABLE IF NOT EXISTS repositories (
@@ -42,7 +50,8 @@ CREATE TABLE IF NOT EXISTS symbols (
     end_line        INTEGER NOT NULL,
     parent_symbol_id INTEGER REFERENCES symbols(id) ON DELETE SET NULL,
     file_rel_path   TEXT    NOT NULL,
-    repo_id         INTEGER NOT NULL REFERENCES repositories(id) ON DELETE CASCADE
+    repo_id         INTEGER NOT NULL REFERENCES repositories(id) ON DELETE CASCADE,
+    name_tokens     TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_symbols_file    ON symbols(file_id);
@@ -75,23 +84,24 @@ CREATE VIRTUAL TABLE IF NOT EXISTS fts_symbols USING fts5(
     doc_comment,
     kind,
     file_rel_path,
+    name_tokens,
     content='symbols',
     content_rowid='id'
 );
 
 CREATE TRIGGER IF NOT EXISTS symbols_ai AFTER INSERT ON symbols BEGIN
-    INSERT INTO fts_symbols(rowid, name, doc_comment, kind, file_rel_path)
-    VALUES (new.id, new.name, new.doc_comment, new.kind, new.file_rel_path);
+    INSERT INTO fts_symbols(rowid, name, doc_comment, kind, file_rel_path, name_tokens)
+    VALUES (new.id, new.name, new.doc_comment, new.kind, new.file_rel_path, new.name_tokens);
 END;
 
 CREATE TRIGGER IF NOT EXISTS symbols_ad AFTER DELETE ON symbols BEGIN
-    INSERT INTO fts_symbols(fts_symbols, rowid, name, doc_comment, kind, file_rel_path)
-    VALUES('delete', old.id, old.name, old.doc_comment, old.kind, old.file_rel_path);
+    INSERT INTO fts_symbols(fts_symbols, rowid, name, doc_comment, kind, file_rel_path, name_tokens)
+    VALUES('delete', old.id, old.name, old.doc_comment, old.kind, old.file_rel_path, old.name_tokens);
 END;
 
 CREATE TRIGGER IF NOT EXISTS symbols_au AFTER UPDATE ON symbols BEGIN
-    INSERT INTO fts_symbols(fts_symbols, rowid, name, doc_comment, kind, file_rel_path)
-    VALUES('delete', old.id, old.name, old.doc_comment, old.kind, old.file_rel_path);
-    INSERT INTO fts_symbols(rowid, name, doc_comment, kind, file_rel_path)
-    VALUES (new.id, new.name, new.doc_comment, new.kind, new.file_rel_path);
+    INSERT INTO fts_symbols(fts_symbols, rowid, name, doc_comment, kind, file_rel_path, name_tokens)
+    VALUES('delete', old.id, old.name, old.doc_comment, old.kind, old.file_rel_path, old.name_tokens);
+    INSERT INTO fts_symbols(rowid, name, doc_comment, kind, file_rel_path, name_tokens)
+    VALUES (new.id, new.name, new.doc_comment, new.kind, new.file_rel_path, new.name_tokens);
 END;
