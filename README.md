@@ -51,7 +51,23 @@ If you encounter issues, have suggestions, or want to share your experience, ple
 
 ## Getting started
 
-### Download
+### Quick install
+
+```bash
+curl -sSf https://sh.ctxhelpr.dev | sh
+```
+
+Detects your platform, downloads the latest release, verifies the checksum, and installs to `~/.local/bin/`.
+
+Options:
+
+```bash
+curl -sSf https://sh.ctxhelpr.dev | sh -s -- --version 1.1.0    # Specific version
+curl -sSf https://sh.ctxhelpr.dev | sh -s -- --install-dir DIR   # Custom directory
+curl -sSf https://sh.ctxhelpr.dev | sh -s -- --skip-setup        # Binary only
+```
+
+### Manual install
 
 Download the latest release for your platform from the [releases page](https://github.com/rijuma/ctxhelpr/releases/latest).
 
@@ -63,14 +79,11 @@ Download the latest release for your platform from the [releases page](https://g
 | macOS   | Intel         | `ctxhelpr-*-macos-x64.tar.gz`   |
 | Windows | x86_64        | `ctxhelpr-*-windows-x64.zip`    |
 
-### Install the binary
-
 **Linux / macOS:**
 
 ```bash
 tar xzf ctxhelpr-*.tar.gz
-sudo mv ctxhelpr /usr/local/bin/
-chmod +x /usr/local/bin/ctxhelpr
+mv ctxhelpr ~/.local/bin/
 ```
 
 **Windows:**
