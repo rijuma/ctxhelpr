@@ -73,7 +73,7 @@ jobs:
           ARCHIVE="ctxhelpr-${VERSION}-${{ matrix.label }}.tar.gz"
           mkdir -p staging
           cp target/${{ matrix.target }}/release/ctxhelpr staging/
-          cp README.md LICENSE staging/
+          cp README.md LICENSE CHANGELOG.md staging/
           cd staging
           tar czf "../$ARCHIVE" .
           cd ..
@@ -88,7 +88,7 @@ jobs:
           ARCHIVE="ctxhelpr-${VERSION}-${{ matrix.label }}.zip"
           mkdir -p staging
           cp target/${{ matrix.target }}/release/ctxhelpr.exe staging/
-          cp README.md LICENSE staging/
+          cp README.md LICENSE CHANGELOG.md staging/
           cd staging
           7z a "../$ARCHIVE" .
           cd ..

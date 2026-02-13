@@ -2,7 +2,10 @@ use anyhow::Result;
 use clap::{Args, Subcommand};
 use std::path::Path;
 
-use crate::config::{CONFIG_FILENAME, Config, ConfigError};
+use crate::config::{
+    CONFIG_FILENAME, Config, ConfigError, GLOBAL_CONFIG_DIR, GLOBAL_CONFIG_FILENAME,
+    global_config_path,
+};
 
 #[derive(Args)]
 pub struct ConfigArgs {
@@ -12,13 +15,20 @@ pub struct ConfigArgs {
 
 #[derive(Subcommand)]
 pub enum ConfigCommand {
-    /// Create a .ctxhelpr.json template in the current directory
-    Init,
-    /// Validate an existing .ctxhelpr.json file
+    /// Create a config template (.ctxhelpr.json locally, or global with --global)
+    Init {
+        /// Create global config at ~/.config/ctxhelpr/config.json instead of local
+        #[arg(long, short)]
+        global: bool,
+    },
+    /// Validate a config file (.ctxhelpr.json locally, or global with --global)
     Validate {
         /// Directory containing .ctxhelpr.json (defaults to current directory)
         #[arg(long)]
         path: Option<String>,
+        /// Validate the global config file instead of a local one
+        #[arg(long, short)]
+        global: bool,
     },
     /// Show resolved configuration (defaults merged with overrides)
     Show {
@@ -30,13 +40,25 @@ pub enum ConfigCommand {
 
 pub fn run(args: ConfigArgs) -> Result<()> {
     match args.command {
-        ConfigCommand::Init => run_init(),
-        ConfigCommand::Validate { path } => run_validate(path),
+        ConfigCommand::Init { global } => {
+            if global {
+                run_init_global()
+            } else {
+                run_init_local()
+            }
+        }
+        ConfigCommand::Validate { path, global } => {
+            if global {
+                run_validate_global()
+            } else {
+                run_validate_local(path)
+            }
+        }
         ConfigCommand::Show { path } => run_show(path),
     }
 }
 
-fn run_init() -> Result<()> {
+fn run_init_local() -> Result<()> {
     let config_path = Path::new(CONFIG_FILENAME);
     if config_path.exists() {
         println!(
@@ -52,7 +74,28 @@ fn run_init() -> Result<()> {
     Ok(())
 }
 
-fn run_validate(path: Option<String>) -> Result<()> {
+fn run_init_global() -> Result<()> {
+    let Some(config_path) = global_config_path() else {
+        println!("Could not determine config directory for this platform.");
+        return Ok(());
+    };
+
+    if config_path.exists() {
+        println!("{} already exists.", config_path.display());
+        return Ok(());
+    }
+
+    if let Some(parent) = config_path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+
+    let template = serde_json::to_string_pretty(&Config::default())?;
+    std::fs::write(&config_path, format!("{template}\n"))?;
+    println!("Created {}", config_path.display());
+    Ok(())
+}
+
+fn run_validate_local(path: Option<String>) -> Result<()> {
     let dir = path.unwrap_or_else(|| ".".to_string());
     match Config::validate(&dir) {
         Ok(config) => {
@@ -60,8 +103,31 @@ fn run_validate(path: Option<String>) -> Result<()> {
             print_config_summary(&config);
             Ok(())
         }
-        Err(ConfigError::NotFound) => {
+        Err(ConfigError::NotFound { .. }) => {
             println!("No {} found in {}", CONFIG_FILENAME, dir);
+            Ok(())
+        }
+        Err(e) => {
+            println!("Error: {e}");
+            std::process::exit(1);
+        }
+    }
+}
+
+fn run_validate_global() -> Result<()> {
+    match Config::validate_global() {
+        Ok(config) => {
+            println!("Valid\n");
+            print_config_summary(&config);
+            Ok(())
+        }
+        Err(ConfigError::NotFound { .. }) => {
+            let path_desc = global_config_path()
+                .map(|p| p.display().to_string())
+                .unwrap_or_else(|| {
+                    format!("<config_dir>/{GLOBAL_CONFIG_DIR}/{GLOBAL_CONFIG_FILENAME}")
+                });
+            println!("No global config found at {path_desc}");
             Ok(())
         }
         Err(e) => {
@@ -73,11 +139,21 @@ fn run_validate(path: Option<String>) -> Result<()> {
 
 fn run_show(path: Option<String>) -> Result<()> {
     let dir = path.unwrap_or_else(|| ".".to_string());
-    let config_path = Path::new(&dir).join(CONFIG_FILENAME);
 
-    if !config_path.exists() {
-        println!("No {} found, using defaults.\n", CONFIG_FILENAME);
+    // Show config source info
+    match global_config_path() {
+        Some(p) if p.exists() => println!("Global config: {}", p.display()),
+        Some(p) => println!("Global config: {} (not found)", p.display()),
+        None => println!("Global config: not available on this platform"),
     }
+
+    let local_path = Path::new(&dir).join(CONFIG_FILENAME);
+    if local_path.exists() {
+        println!("Local config:  {}", local_path.display());
+    } else {
+        println!("Local config:  {} (not found)", local_path.display());
+    }
+    println!();
 
     let config = Config::load(&dir).unwrap_or_default();
     println!("{}", serde_json::to_string_pretty(&config)?);
