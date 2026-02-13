@@ -2,6 +2,7 @@ use anyhow::Result;
 use clap::{Args, CommandFactory, Parser, Subcommand};
 
 mod cli;
+mod config;
 mod indexer;
 mod mcp;
 mod output;
@@ -9,6 +10,7 @@ mod server;
 mod storage;
 
 use cli::Scope;
+use cli::config_cmd::ConfigArgs;
 
 #[derive(Parser)]
 #[command(name = "ctxhelpr", about = "Semantic code indexing for Claude Code")]
@@ -27,6 +29,8 @@ enum Commands {
     Uninstall(ScopeArgs),
     /// Manage ctxhelpr tool permissions in Claude Code
     Perms(PermsArgs),
+    /// Manage project configuration (.ctxhelpr.json)
+    Config(ConfigArgs),
 }
 
 #[derive(Args)]
@@ -83,6 +87,7 @@ async fn main() -> Result<()> {
         Some(Commands::Install(args)) => cli::install::run(args.into_scope()),
         Some(Commands::Uninstall(args)) => cli::uninstall::run(args.into_scope()),
         Some(Commands::Perms(args)) => cli::perms::run(args.scope(), args.all, args.remove),
+        Some(Commands::Config(args)) => cli::config_cmd::run(args),
         None => {
             Cli::command().print_help()?;
             Ok(())

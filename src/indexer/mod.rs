@@ -25,6 +25,8 @@ const DEFAULT_IGNORE: &[&str] = &[
     ".cache",
 ];
 
+const DEFAULT_IGNORE_SUFFIXES: &[&str] = &[".min.js", ".min.mjs", ".min.cjs", ".min.css"];
+
 const MAX_FILE_SIZE: u64 = 1_048_576; // 1MB
 
 #[derive(Debug, Clone)]
@@ -160,7 +162,12 @@ impl Indexer {
             .map(|e| e.as_ref())
     }
 
-    pub fn index(&self, repo_path: &str, storage: &SqliteStorage) -> Result<IndexStats> {
+    pub fn index(
+        &self,
+        repo_path: &str,
+        storage: &SqliteStorage,
+        ignore_patterns: &[String],
+    ) -> Result<IndexStats> {
         let start = Instant::now();
         let abs_path = std::fs::canonicalize(repo_path)
             .with_context(|| format!("Invalid repository path: {}", repo_path))?;
@@ -218,6 +225,10 @@ impl Indexer {
                 continue;
             }
 
+            if matches_ignore_pattern(&rel_path, ignore_patterns) {
+                continue;
+            }
+
             let previous_entry = existing_map.remove(&rel_path);
 
             match process_file(
@@ -269,6 +280,7 @@ impl Indexer {
         repo_path: &str,
         files: &[String],
         storage: &SqliteStorage,
+        ignore_patterns: &[String],
     ) -> Result<IndexStats> {
         let start = Instant::now();
         let abs_path = std::fs::canonicalize(repo_path)?;
@@ -284,6 +296,10 @@ impl Indexer {
         let mut files_updated = 0;
 
         for rel_path in files {
+            if matches_ignore_pattern(rel_path, ignore_patterns) {
+                continue;
+            }
+
             let full_path = abs_path.join(rel_path);
             if !full_path.exists() {
                 continue;
@@ -435,7 +451,27 @@ fn is_ignored(entry: &walkdir::DirEntry) -> bool {
     if entry.file_type().is_dir() {
         return DEFAULT_IGNORE.contains(&name);
     }
+    if entry.file_type().is_file() {
+        return DEFAULT_IGNORE_SUFFIXES
+            .iter()
+            .any(|suffix| name.ends_with(suffix));
+    }
     false
+}
+
+fn matches_ignore_pattern(rel_path: &str, patterns: &[String]) -> bool {
+    patterns.iter().any(|pattern| {
+        if let Some(suffix) = pattern.strip_prefix('*') {
+            // e.g. "*.min.js" → suffix match ".min.js"
+            rel_path.ends_with(suffix)
+        } else if pattern.ends_with('/') {
+            // e.g. "generated/" → directory prefix match
+            rel_path.starts_with(pattern) || rel_path.contains(&format!("/{}", pattern))
+        } else {
+            // Exact filename match
+            rel_path == pattern || rel_path.ends_with(&format!("/{}", pattern))
+        }
+    })
 }
 
 fn count_symbols(sym: &ExtractedSymbol) -> usize {

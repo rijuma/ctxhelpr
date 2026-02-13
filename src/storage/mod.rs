@@ -1,8 +1,12 @@
+pub mod tokenizer;
+
 use anyhow::{Context, Result};
 use rusqlite::{Connection, params};
 use std::path::PathBuf;
 
 use crate::indexer::{ExtractedRef, ExtractedSymbol};
+
+use self::tokenizer::split_code_identifier;
 
 const SCHEMA: &str = include_str!("schema.sql");
 
@@ -125,6 +129,13 @@ impl SymbolRecord {
     }
 }
 
+fn rows_empty(conn: &Connection, table: &str) -> Result<bool> {
+    let count: i64 = conn.query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| {
+        row.get(0)
+    })?;
+    Ok(count == 0)
+}
+
 pub fn db_path_for_repo(repo_path: &str) -> PathBuf {
     use sha2::{Digest, Sha256};
     let hash = hex::encode(Sha256::digest(repo_path.as_bytes()));
@@ -147,16 +158,88 @@ impl SqliteStorage {
         }
         let conn = Connection::open(&db_path)
             .with_context(|| format!("Failed to open database at {}", db_path.display()))?;
-        conn.execute_batch(SCHEMA)
-            .context("Failed to initialize database schema")?;
-        Ok(Self { conn })
+        let storage = Self { conn };
+        storage.migrate()?;
+        Ok(storage)
     }
 
     #[allow(dead_code)] // Used by integration tests
     pub fn open_memory() -> Result<Self> {
         let conn = Connection::open_in_memory()?;
-        conn.execute_batch(SCHEMA)?;
-        Ok(Self { conn })
+        let storage = Self { conn };
+        storage.migrate()?;
+        Ok(storage)
+    }
+
+    fn migrate(&self) -> Result<()> {
+        // Check if this is an existing DB that needs migration
+        let has_name_tokens = self.has_column("symbols", "name_tokens");
+        let has_metadata = self.has_table("metadata");
+
+        if !has_metadata || !has_name_tokens {
+            // Either fresh DB or pre-migration DB — apply full schema
+            // For existing DBs, we need to add new columns/tables before re-creating triggers
+            if !has_name_tokens && self.has_table("symbols") {
+                // Old DB: add name_tokens column and rebuild FTS
+                self.conn
+                    .execute_batch("ALTER TABLE symbols ADD COLUMN name_tokens TEXT")
+                    .context("Failed to add name_tokens column")?;
+
+                // Populate name_tokens for existing symbols
+                let mut stmt = self.conn.prepare("SELECT id, name FROM symbols")?;
+                let rows: Vec<(i64, String)> = stmt
+                    .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
+                    .collect::<std::result::Result<Vec<_>, _>>()?;
+                drop(stmt);
+
+                for (id, name) in &rows {
+                    let tokens = split_code_identifier(name);
+                    self.conn.execute(
+                        "UPDATE symbols SET name_tokens = ?1 WHERE id = ?2",
+                        params![tokens, id],
+                    )?;
+                }
+
+                // Drop old FTS table and triggers, let schema re-create them
+                self.conn.execute_batch(
+                    "DROP TRIGGER IF EXISTS symbols_ai;
+                     DROP TRIGGER IF EXISTS symbols_ad;
+                     DROP TRIGGER IF EXISTS symbols_au;
+                     DROP TABLE IF EXISTS fts_symbols;",
+                )?;
+            }
+
+            // Apply full schema (CREATE IF NOT EXISTS is safe for existing tables)
+            self.conn
+                .execute_batch(SCHEMA)
+                .context("Failed to initialize database schema")?;
+
+            // Rebuild FTS content if we migrated an existing DB
+            if !has_name_tokens && !rows_empty(&self.conn, "symbols")? {
+                self.conn
+                    .execute_batch("INSERT INTO fts_symbols(fts_symbols) VALUES('rebuild')")?;
+            }
+
+            // Set schema version
+            self.conn.execute(
+                "INSERT OR REPLACE INTO metadata (key, value) VALUES ('schema_version', '2')",
+                [],
+            )?;
+        }
+
+        Ok(())
+    }
+
+    fn has_column(&self, table: &str, column: &str) -> bool {
+        self.conn
+            .prepare(&format!("SELECT {column} FROM {table} LIMIT 0"))
+            .is_ok()
+    }
+
+    fn has_table(&self, table: &str) -> bool {
+        self.conn
+            .prepare(&format!("SELECT 1 FROM {table} LIMIT 0"))
+            .is_ok()
     }
 
     // ── Transaction control ──
@@ -259,9 +342,10 @@ impl SqliteStorage {
         sym: &ExtractedSymbol,
         parent_id: Option<i64>,
     ) -> Result<i64> {
+        let name_tokens = split_code_identifier(&sym.name);
         self.conn.execute(
-            "INSERT INTO symbols (file_id, name, kind, signature, doc_comment, start_line, end_line, parent_symbol_id, file_rel_path, repo_id)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+            "INSERT INTO symbols (file_id, name, kind, signature, doc_comment, start_line, end_line, parent_symbol_id, file_rel_path, repo_id, name_tokens)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
             params![
                 file_id,
                 sym.name,
@@ -273,6 +357,7 @@ impl SqliteStorage {
                 parent_id,
                 file_rel_path,
                 repo_id,
+                name_tokens,
             ],
         )?;
         Ok(self.conn.last_insert_rowid())
