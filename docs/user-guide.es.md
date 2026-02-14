@@ -56,7 +56,7 @@ Extraé el archivo `.zip` y colocá `ctxhelpr.exe` en un directorio que esté en
 ### Integración con Claude Code
 
 ```text
-ctxhelpr install [-l | -g]
+ctxhelpr enable [-l | -g]
 ```
 
 Registra el servidor MCP, instala el archivo de skill y el comando `/index`, ofrece otorgar permisos a las herramientas, y muestra la ruta de la base de datos. Usá `-l` / `--local` para el directorio `.claude/` del proyecto, o `-g` / `--global` para `~/.claude/`. Si no se especifica ninguno, se te preguntará cuál elegir.
@@ -67,15 +67,31 @@ Registra el servidor MCP, instala el archivo de skill y el comando `/index`, ofr
 ctxhelpr perms [-l | -g] [-a | -r]
 ```
 
-Gestiona qué herramientas de ctxhelpr puede llamar Claude Code sin preguntar. Sin flags, abre un checklist interactivo. `-a` / `--all` otorga todos los permisos; `-r` / `--remove` los revoca. Durante la instalación se te preguntará si querés otorgar todos; usá `ctxhelpr perms` para cambiarlos después.
+Gestiona qué herramientas de ctxhelpr puede llamar Claude Code sin preguntar. Sin flags, abre un checklist interactivo. `-a` / `--all` otorga todos los permisos; `-r` / `--remove` los revoca. Durante la configuración se te preguntará si querés otorgar todos; usá `ctxhelpr perms` para cambiarlos después.
+
+### Deshabilitar
+
+```text
+ctxhelpr disable [-l | -g]
+```
+
+Pide confirmación antes de proceder. Elimina todas las integraciones y revoca permisos de herramientas. Ofrece eliminar las bases de datos de índice: deshabilitar localmente ofrece eliminar la DB del repo actual (por defecto: sí), globalmente ofrece eliminar todas las DBs (por defecto: sí). Si existe un `.ctxhelpr.json` en el directorio actual, ofrece eliminarlo (por defecto: no).
+
+### Actualizar
+
+```text
+ctxhelpr update
+```
+
+Busca una versión más reciente en GitHub, descarga y verifica el release, y reemplaza el binario actual. También refresca los archivos de skill y comando si existen. Sugiere re-indexar los repositorios después de actualizar.
 
 ### Desinstalar
 
 ```text
-ctxhelpr uninstall [-l | -g]
+ctxhelpr uninstall
 ```
 
-Elimina todas las integraciones y revoca permisos de herramientas. Ofrece eliminar las bases de datos de índice: la desinstalación local ofrece eliminar la DB del repo actual (por defecto: sí), la global ofrece eliminar todas las DBs (por defecto: no).
+Elimina completamente ctxhelpr de tu sistema. Pide confirmación, luego deshabilita todas las integraciones (global y local), y elimina el binario.
 
 ## Referencia de Herramientas MCP
 
@@ -175,16 +191,18 @@ Todo esto pasa automáticamente vía el archivo de skill — no se necesita conf
 ```text
 ctxhelpr                                    # Mostrar ayuda
 ctxhelpr serve                              # Servidor MCP (usado internamente por Claude Code)
-ctxhelpr install [-l | -g]                  # Instalar integración
-ctxhelpr uninstall [-l | -g]                # Eliminar integración
+ctxhelpr enable [-l | -g]                   # Habilitar integración
+ctxhelpr disable [-l | -g]                  # Deshabilitar integración
 ctxhelpr perms [-l | -g] [-a | -r]          # Gestionar permisos
 ctxhelpr config init                        # Crear template .ctxhelpr.json
 ctxhelpr config validate [--path dir]       # Validar archivo de configuración
 ctxhelpr config show [--path dir]           # Mostrar configuración resuelta
 ctxhelpr repos list                         # Listar todos los repositorios indexados
 ctxhelpr repos delete [paths...]            # Eliminar datos de índice (interactivo si no se dan paths)
+ctxhelpr update                             # Actualizar a la última versión
+ctxhelpr uninstall                          # Eliminar completamente ctxhelpr
 ```
 
 `serve` no está pensado para ejecutarse manualmente. Claude Code lo inicia vía stdio; se detiene automáticamente cuando la sesión termina.
 
-Cuando no se especifica `-l` ni `-g`: `install` te pregunta cuál elegir; los otros comandos auto-detectan buscando primero un `.claude/settings.json` local, y si no existe, usan el global.
+Cuando no se especifica `-l` ni `-g`: `enable` te pregunta cuál elegir; los otros comandos auto-detectan buscando primero un `.claude/settings.json` local, y si no existe, usan el global.

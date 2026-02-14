@@ -1,13 +1,16 @@
 pub mod config_cmd;
-pub mod install;
+pub mod disable;
+pub mod enable;
 pub mod permissions;
 pub mod perms;
 pub mod repos;
 pub mod uninstall;
+pub mod update;
 
 use anyhow::Result;
 use std::path::PathBuf;
 
+#[derive(Clone, Copy)]
 pub enum Scope {
     Local,
     Global,

@@ -20,10 +20,10 @@ The result: faster context building, fewer tokens burned, and Claude actually _u
 curl -sSfL https://sh.ctxhelpr.dev | sh
 ```
 
-Then install it to Claude Code:
+Then enable it in Claude Code:
 
 ```text
-ctxhelpr install
+ctxhelpr enable
 ```
 
 Run `ctxhelpr --help` for all CLI commands.

@@ -33,7 +33,7 @@ cargo test test_name -- --nocapture          # Run with stdout/stderr visible
 RUST_LOG=ctxhelpr=debug cargo run -- serve   # Run MCP server with debug logging
 ```
 
-ctxhelpr has six subcommands: `serve`, `install`, `uninstall`, `perms`, `config`, `repos`.
+ctxhelpr has eight subcommands: `serve`, `enable`, `disable`, `perms`, `config`, `repos`, `update`, `uninstall`.
 
 ### Testing
 
@@ -60,7 +60,7 @@ Files on disk → tree-sitter parsing → ExtractedSymbol/ExtractedRef → SQLit
 src/
 ├── main.rs                 # CLI entry point
 ├── config.rs               # Project configuration (.ctxhelpr.json)
-├── cli/                    # install, uninstall, perms, permissions & repos
+├── cli/                    # enable, disable, perms, permissions & repos
 ├── server/                 # MCP server (stdio transport)
 ├── mcp/                    # Tool definitions and handlers
 ├── indexer/                # Core indexing logic + language extractors
@@ -79,7 +79,7 @@ src/
 - **`indexer/languages/`** - One module per language (TypeScript, Python, Rust, Ruby, Markdown). Each extractor returns `Vec<ExtractedSymbol>` from tree-sitter AST traversal.
 - **`storage/`** - `SqliteStorage` wraps rusqlite. Schema is in `schema.sql` (loaded via `include_str!`). DB is per-repo, stored at `~/.cache/ctxhelpr/<hash>.db`. FTS5 virtual table with triggers keeps full-text index in sync. Provides `begin_transaction()`/`commit()` for batching - the indexer wraps all operations in a single transaction for performance.
 - **`output/`** - `CompactFormatter` produces token-efficient JSON with short keys (`n`, `k`, `f`, `l`, `sig`, `doc`, `id`).
-- **`cli/`** - `install.rs` registers the MCP server, installs a skill file and `/index` command into `~/.claude/`. `uninstall.rs` removes the registration, skill file, and command.
+- **`cli/`** - `enable.rs` registers the MCP server, installs a skill file and `/index` command into `~/.claude/`. `disable.rs` removes the registration, skill file, and command.
 - **`assets/`** - Embedded markdown templates for the skill and slash command (included at compile time).
 
 The `lib.rs` re-exports `indexer`, `output`, and `storage` for use in integration tests.

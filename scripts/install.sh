@@ -300,12 +300,12 @@ setup_claude_code() {
         case "$answer" in
             [nN]|[nN][oO]) ;;
             *)
-                info "Running ctxhelpr install -g..."
-                "$INSTALL_DIR/ctxhelpr" install -g
+                info "Running ctxhelpr enable -g..."
+                "$INSTALL_DIR/ctxhelpr" enable -g
                 ;;
         esac
     else
-        info "Run 'ctxhelpr install -g' to set up Claude Code integration."
+        info "Run 'ctxhelpr enable -g' to set up Claude Code integration."
     fi
 }
 

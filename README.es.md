@@ -20,10 +20,10 @@ El resultado: construcción de contexto más rápida, menos tokens gastados, y C
 curl -sSfL https://sh.ctxhelpr.dev | sh
 ```
 
-Después instalalo en Claude Code:
+Después habilitalo en Claude Code:
 
 ```text
-ctxhelpr install
+ctxhelpr enable
 ```
 
 Ejecutá `ctxhelpr --help` para todos los comandos del CLI.

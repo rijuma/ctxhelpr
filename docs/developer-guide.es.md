@@ -33,7 +33,7 @@ cargo test test_name -- --nocapture          # Ejecutar con stdout/stderr visibl
 RUST_LOG=ctxhelpr=debug cargo run -- serve   # Ejecutar servidor MCP con logging de debug
 ```
 
-ctxhelpr tiene seis subcomandos: `serve`, `install`, `uninstall`, `perms`, `config`, `repos`.
+ctxhelpr tiene ocho subcomandos: `serve`, `enable`, `disable`, `perms`, `config`, `repos`, `update`, `uninstall`.
 
 ### Testing
 
@@ -60,7 +60,7 @@ Archivos en disco → parsing con tree-sitter → ExtractedSymbol/ExtractedRef �
 src/
 ├── main.rs                 # Punto de entrada del CLI
 ├── config.rs               # Configuración por proyecto (.ctxhelpr.json)
-├── cli/                    # Comandos install, uninstall, perms, permissions y repos
+├── cli/                    # Comandos enable, disable, perms, permissions y repos
 ├── server/                 # Servidor MCP (transporte stdio)
 ├── mcp/                    # Definiciones y handlers de herramientas
 ├── indexer/                # Lógica de indexación + extractores por lenguaje
@@ -79,7 +79,7 @@ src/
 - **`indexer/languages/`** - Un módulo por lenguaje (TypeScript, Python, Rust, Ruby, Markdown). Cada extractor devuelve `Vec<ExtractedSymbol>` del recorrido del AST de tree-sitter.
 - **`storage/`** - `SqliteStorage` envuelve rusqlite. El esquema está en `schema.sql` (cargado vía `include_str!`). La DB es por repo, almacenada en `~/.cache/ctxhelpr/<hash>.db`. La tabla virtual FTS5 con triggers mantiene el índice full-text sincronizado. Provee `begin_transaction()`/`commit()` para batching - el indexer envuelve todas las operaciones en una sola transacción por rendimiento.
 - **`output/`** - `CompactFormatter` produce JSON eficiente en tokens con claves cortas (`n`, `k`, `f`, `l`, `sig`, `doc`, `id`).
-- **`cli/`** - `install.rs` registra el servidor MCP, instala un archivo de skill y el comando `/index` en `~/.claude/`. `uninstall.rs` elimina el registro, el archivo de skill y el comando.
+- **`cli/`** - `enable.rs` registra el servidor MCP, instala un archivo de skill y el comando `/index` en `~/.claude/`. `disable.rs` elimina el registro, el archivo de skill y el comando.
 - **`assets/`** - Templates markdown embebidos para el skill y slash command (incluidos en tiempo de compilación).
 
 `lib.rs` re-exporta `indexer`, `output` y `storage` para uso en tests de integración.

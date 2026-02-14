@@ -56,7 +56,7 @@ Extract the `.zip` file and place `ctxhelpr.exe` in a directory that is in your 
 ### Claude Code integration
 
 ```text
-ctxhelpr install [-l | -g]
+ctxhelpr enable [-l | -g]
 ```
 
 Registers the MCP server, installs the skill file and `/index` command, prompts to grant tool permissions, and prints the database path. Use `-l` / `--local` for the project's `.claude/` directory, or `-g` / `--global` for `~/.claude/`. If neither is specified, you'll be prompted to choose.
@@ -67,15 +67,31 @@ Registers the MCP server, installs the skill file and `/index` command, prompts 
 ctxhelpr perms [-l | -g] [-a | -r]
 ```
 
-Manages which ctxhelpr tools Claude Code can call without prompting. Without flags, opens an interactive checklist. `-a` / `--all` grants all permissions; `-r` / `--remove` revokes them. During install you'll be asked to grant all; use `ctxhelpr perms` to change them later.
+Manages which ctxhelpr tools Claude Code can call without prompting. Without flags, opens an interactive checklist. `-a` / `--all` grants all permissions; `-r` / `--remove` revokes them. During setup you'll be asked to grant all; use `ctxhelpr perms` to change them later.
+
+### Disable
+
+```text
+ctxhelpr disable [-l | -g]
+```
+
+Asks for confirmation before proceeding. Removes all integrations and revokes tool permissions. Prompts to delete index databases: local disable offers to delete the current repo's DB (default: yes), global disable offers to delete all DBs (default: yes). If a `.ctxhelpr.json` exists in the current directory, offers to delete it (default: no).
+
+### Update
+
+```text
+ctxhelpr update
+```
+
+Checks for a newer version on GitHub, downloads and verifies the release, and replaces the current binary. Also refreshes skill and command files if they exist. Suggests reindexing repositories after updating.
 
 ### Uninstall
 
 ```text
-ctxhelpr uninstall [-l | -g]
+ctxhelpr uninstall
 ```
 
-Removes all integrations and revokes tool permissions. Prompts to delete index databases: local uninstall offers to delete the current repo's DB (default: yes), global uninstall offers to delete all DBs (default: no).
+Completely removes ctxhelpr from your system. Asks for confirmation, then disables all integrations (global and local), and deletes the binary itself.
 
 ## MCP Tools Reference
 
@@ -175,16 +191,18 @@ This all happens automatically via the skill file — no additional setup needed
 ```text
 ctxhelpr                                    # Show help
 ctxhelpr serve                              # MCP server (used internally by Claude Code)
-ctxhelpr install [-l | -g]                  # Install integration
-ctxhelpr uninstall [-l | -g]                # Remove integration
+ctxhelpr enable [-l | -g]                   # Enable integration
+ctxhelpr disable [-l | -g]                  # Disable integration
 ctxhelpr perms [-l | -g] [-a | -r]          # Manage permissions
 ctxhelpr config init                        # Create .ctxhelpr.json template
 ctxhelpr config validate [--path dir]       # Validate config file
 ctxhelpr config show [--path dir]           # Show resolved config
 ctxhelpr repos list                         # List all indexed repositories
 ctxhelpr repos delete [paths...]            # Delete index data (interactive if no paths)
+ctxhelpr update                             # Update to the latest version
+ctxhelpr uninstall                          # Completely remove ctxhelpr
 ```
 
 `serve` is not meant to be run manually. Claude Code spawns it via stdio; it stops automatically when the session ends.
 
-When neither `-l` nor `-g` is specified: `install` prompts you to choose; other commands auto-detect by checking for a local `.claude/settings.json` first, falling back to global.
+When neither `-l` nor `-g` is specified: `enable` prompts you to choose; other commands auto-detect by checking for a local `.claude/settings.json` first, falling back to global.

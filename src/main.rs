@@ -24,10 +24,10 @@ struct Cli {
 enum Commands {
     /// Internal: MCP server started automatically by Claude Code (not for manual use)
     Serve,
-    /// Install ctxhelpr integration with Claude Code
-    Install(ScopeArgs),
-    /// Remove ctxhelpr integration from Claude Code
-    Uninstall(ScopeArgs),
+    /// Enable ctxhelpr integration with Claude Code
+    Enable(ScopeArgs),
+    /// Disable ctxhelpr integration from Claude Code
+    Disable(ScopeArgs),
     /// Manage ctxhelpr tool permissions in Claude Code
     Perms(PermsArgs),
     /// Manage project configuration (.ctxhelpr.json)
@@ -37,14 +37,18 @@ enum Commands {
         #[command(subcommand)]
         command: ReposCommands,
     },
+    /// Update ctxhelpr to the latest version
+    Update,
+    /// Completely uninstall ctxhelpr (disable + remove binary)
+    Uninstall,
 }
 
 #[derive(Args)]
 struct ScopeArgs {
-    /// Install to local project (.claude/)
+    /// Enable for local project (.claude/)
     #[arg(short = 'l', long, conflicts_with = "global")]
     local: bool,
-    /// Install to global ~/.claude/
+    /// Enable for global ~/.claude/
     #[arg(short = 'g', long, conflicts_with = "local")]
     global: bool,
 }
@@ -90,11 +94,13 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
     match cli.command {
         Some(Commands::Serve) => server::run().await,
-        Some(Commands::Install(args)) => cli::install::run(args.into_scope()),
-        Some(Commands::Uninstall(args)) => cli::uninstall::run(args.into_scope()),
+        Some(Commands::Enable(args)) => cli::enable::run(args.into_scope()),
+        Some(Commands::Disable(args)) => cli::disable::run(args.into_scope()),
         Some(Commands::Perms(args)) => cli::perms::run(args.scope(), args.all, args.remove),
         Some(Commands::Config(args)) => cli::config_cmd::run(args),
         Some(Commands::Repos { command }) => cli::repos::run(command),
+        Some(Commands::Update) => cli::update::run(),
+        Some(Commands::Uninstall) => cli::uninstall::run(),
         None => {
             Cli::command().print_help()?;
             Ok(())
