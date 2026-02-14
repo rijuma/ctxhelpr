@@ -187,7 +187,9 @@ resolve_version() {
 
     VERSION="$(printf '%s' "$api_response" | grep '"tag_name"' | sed 's/.*"tag_name"[[:space:]]*:[[:space:]]*"v\{0,1\}\([^"]*\)".*/\1/')"
 
-    [ -z "$VERSION" ] && err "could not determine latest version from GitHub API"
+    if [ -z "$VERSION" ]; then
+        err "could not determine latest version from GitHub API"
+    fi
 }
 
 # ---------------------------------------------------------------------------
@@ -289,24 +291,24 @@ setup_claude_code() {
 
     printf '\n'
 
-    # Reconnect stdin to the terminal when piped (curl | sh)
-    if [ ! -t 0 ] && [ -e /dev/tty ]; then
-        exec < /dev/tty
-    fi
-
     if [ -t 0 ]; then
         printf 'Set up Claude Code integration now? [Y/n] '
-        read -r answer </dev/stdin
-        case "$answer" in
-            [nN]|[nN][oO]) ;;
-            *)
-                info "Running ctxhelpr enable -g..."
-                "$INSTALL_DIR/ctxhelpr" enable -g
-                ;;
-        esac
+        read -r answer
+    elif [ -e /dev/tty ]; then
+        printf 'Set up Claude Code integration now? [Y/n] '
+        read -r answer < /dev/tty
     else
         info "Run 'ctxhelpr enable -g' to set up Claude Code integration."
+        return
     fi
+
+    case "$answer" in
+        [nN]|[nN][oO]) ;;
+        *)
+            info "Running ctxhelpr enable -g..."
+            "$INSTALL_DIR/ctxhelpr" enable -g
+            ;;
+    esac
 }
 
 # ---------------------------------------------------------------------------
