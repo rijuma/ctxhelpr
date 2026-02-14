@@ -114,7 +114,7 @@ jobs:
           echo "" >> pr-body.md
           echo "Bumps version from ${{ steps.current.outputs.version }} to ${{ steps.new.outputs.version }} (${{ inputs.bump }})." >> pr-body.md
           echo "" >> pr-body.md
-          echo "### Changelog" >> pr-body.md
+          echo "### Changes" >> pr-body.md
           echo "" >> pr-body.md
           cat release-notes.md >> pr-body.md
 
