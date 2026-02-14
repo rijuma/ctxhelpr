@@ -37,11 +37,17 @@ function parseOS(ua) {
   return "unknown"
 }
 
+function isCliClient(ua) {
+  return /^(curl|Wget|libcurl|fetch)\b/i.test(ua)
+}
+
 async function logInstall(request, env) {
   if (!env.INSTALLS) return
 
-  const cf = request.cf || {}
   const ua = request.headers.get("User-Agent") || ""
+  if (!isCliClient(ua)) return
+
+  const cf = request.cf || {}
 
   env.INSTALLS.writeDataPoint({
     indexes: [cf.country || "unknown"],
