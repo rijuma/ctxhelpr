@@ -1,6 +1,6 @@
 ---
 name: index
-description: Index or re-index the current repository for fast code navigation
+description: "[ctxhelpr] Index or re-index the current repository for fast code navigation"
 argument-hint: [path (optional, defaults to cwd)]
 ---
 
