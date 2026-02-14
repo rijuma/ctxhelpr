@@ -1,3 +1,6 @@
+[![en](https://img.shields.io/badge/lang-en-green.svg)](./indexing-strategy.md)
+[![es](https://img.shields.io/badge/lang-es-lightgray.svg)](./indexing-strategy.es.md)
+
 # Indexing Strategy
 
 This document explains how ctxhelpr indexes codebases, the design decisions behind the approach, and known tradeoffs.
@@ -10,7 +13,7 @@ The key insight: AI agents don't need to read raw source files to navigate code.
 
 ## Data Flow
 
-```
+```text
 Files on disk
     |
     v
