@@ -37,7 +37,7 @@ pub fn run(scope: Scope, all: bool, remove: bool) -> Result<()> {
         }
     };
 
-    let mut grants = [false; 9];
+    let mut grants = [false; 11];
     for idx in &selections {
         grants[*idx] = true;
     }
@@ -45,7 +45,10 @@ pub fn run(scope: Scope, all: bool, remove: bool) -> Result<()> {
     permissions::set_grants(&settings_path, &grants)?;
 
     let granted_count = selections.len();
-    println!("Updated ctxhelpr permissions: {granted_count}/9 tools allowed ({scope_label}).");
+    let total = permissions::TOOL_PERMISSIONS.len();
+    println!(
+        "Updated ctxhelpr permissions: {granted_count}/{total} tools allowed ({scope_label})."
+    );
     println!("  Settings: {}", settings_path.display());
 
     Ok(())

@@ -8,12 +8,22 @@ use serde_json::{Value, json};
 pub use formatter::OutputFormatter;
 pub use token_budget::TokenBudget;
 
+use crate::config::OutputConfig;
 use crate::storage::*;
 
-const MAX_SIG_LEN: usize = 120;
-const MAX_DOC_BRIEF_LEN: usize = 100;
+pub struct CompactFormatter {
+    max_sig_len: usize,
+    max_doc_brief_len: usize,
+}
 
-pub struct CompactFormatter;
+impl CompactFormatter {
+    pub fn new(config: &OutputConfig) -> Self {
+        Self {
+            max_sig_len: config.truncate_signatures,
+            max_doc_brief_len: config.truncate_doc_comments,
+        }
+    }
+}
 
 impl OutputFormatter for CompactFormatter {
     fn format_index_result(&self, stats: &IndexStats) -> String {
@@ -58,8 +68,16 @@ impl OutputFormatter for CompactFormatter {
             .map(|m| json!({"p": m.path, "files": m.file_count, "syms": m.symbol_count}))
             .collect();
 
-        let top_types: Vec<Value> = data.top_types.iter().map(symbol_brief).collect();
-        let entry_points: Vec<Value> = data.entry_points.iter().map(symbol_brief).collect();
+        let top_types: Vec<Value> = data
+            .top_types
+            .iter()
+            .map(|s| symbol_brief(s, true, self.max_sig_len, self.max_doc_brief_len))
+            .collect();
+        let entry_points: Vec<Value> = data
+            .entry_points
+            .iter()
+            .map(|s| symbol_brief(s, true, self.max_sig_len, self.max_doc_brief_len))
+            .collect();
 
         json!({
             "repo": data.repo_name,
@@ -83,13 +101,15 @@ impl OutputFormatter for CompactFormatter {
             .iter()
             .filter(|s| s.parent_symbol_id.is_none())
             .map(|s| {
-                let mut v = symbol_brief_no_file(s);
+                let mut v = symbol_brief(s, false, self.max_sig_len, self.max_doc_brief_len);
                 if let Some(children) = children_by_parent.get(&s.id) {
-                    let child_values: Vec<Value> =
-                        children.iter().map(|c| symbol_brief_no_file(c)).collect();
-                    v.as_object_mut()
-                        .unwrap()
-                        .insert("children".to_string(), json!(child_values));
+                    let child_values: Vec<Value> = children
+                        .iter()
+                        .map(|c| symbol_brief(c, false, self.max_sig_len, self.max_doc_brief_len))
+                        .collect();
+                    if let Some(obj) = v.as_object_mut() {
+                        obj.insert("children".to_string(), json!(child_values));
+                    }
                 }
                 v
             })
@@ -162,8 +182,10 @@ impl OutputFormatter for CompactFormatter {
             } else if let Some(only) = path_index.into_list().into_iter().next() {
                 if let Some(called_by_arr) = obj["called_by"].as_array_mut() {
                     for item in called_by_arr {
-                        item.as_object_mut().unwrap().remove("fi");
-                        item["from_f"] = json!(only);
+                        if let Some(item_obj) = item.as_object_mut() {
+                            item_obj.remove("fi");
+                            item_obj.insert("from_f".to_string(), json!(only));
+                        }
                     }
                 }
             }
@@ -203,7 +225,7 @@ impl OutputFormatter for CompactFormatter {
                     "l": format!("{}-{}", h.start_line, h.end_line),
                 });
                 if let Some(sig) = &h.signature {
-                    v["sig"] = json!(normalize_signature(sig));
+                    v["sig"] = json!(normalize_signature(sig, self.max_sig_len));
                 }
                 v
             })
@@ -215,8 +237,10 @@ impl OutputFormatter for CompactFormatter {
         } else if let Some(only) = path_index.into_list().into_iter().next() {
             if let Some(arr) = obj["hits"].as_array_mut() {
                 for item in arr {
-                    item.as_object_mut().unwrap().remove("fi");
-                    item["f"] = json!(only);
+                    if let Some(item_obj) = item.as_object_mut() {
+                        item_obj.remove("fi");
+                        item_obj.insert("f".to_string(), json!(only));
+                    }
                 }
             }
         }
@@ -253,8 +277,10 @@ impl OutputFormatter for CompactFormatter {
         } else if let Some(only) = path_index.into_list().into_iter().next() {
             if let Some(arr) = obj["refs_to"].as_array_mut() {
                 for item in arr {
-                    item.as_object_mut().unwrap().remove("fi");
-                    item["from_f"] = json!(only);
+                    if let Some(item_obj) = item.as_object_mut() {
+                        item_obj.remove("fi");
+                        item_obj.insert("from_f".to_string(), json!(only));
+                    }
                 }
             }
         }
@@ -315,35 +341,26 @@ impl OutputFormatter for CompactFormatter {
 
 // ── Shared helpers ──
 
-fn symbol_brief(s: &SymbolRecord) -> Value {
-    let mut v = json!({
-        "id": s.id,
-        "n": s.name,
-        "k": s.kind,
-        "f": s.file_rel_path,
-        "l": format!("{}-{}", s.start_line, s.end_line),
-    });
-    if let Some(sig) = &s.signature {
-        v["sig"] = json!(normalize_signature(sig));
-    }
-    if let Some(doc) = &s.doc_comment {
-        v["doc"] = json!(truncate_doc(doc));
-    }
-    v
-}
-
-fn symbol_brief_no_file(s: &SymbolRecord) -> Value {
+fn symbol_brief(
+    s: &SymbolRecord,
+    include_file: bool,
+    max_sig_len: usize,
+    max_doc_brief_len: usize,
+) -> Value {
     let mut v = json!({
         "id": s.id,
         "n": s.name,
         "k": s.kind,
         "l": format!("{}-{}", s.start_line, s.end_line),
     });
+    if include_file {
+        v["f"] = json!(s.file_rel_path);
+    }
     if let Some(sig) = &s.signature {
-        v["sig"] = json!(normalize_signature(sig));
+        v["sig"] = json!(normalize_signature(sig, max_sig_len));
     }
     if let Some(doc) = &s.doc_comment {
-        v["doc"] = json!(truncate_doc(doc));
+        v["doc"] = json!(truncate_doc(doc, max_doc_brief_len));
     }
     v
 }
@@ -384,7 +401,19 @@ impl PathIndex {
 
 // ── Signature normalization ──
 
-fn normalize_signature(sig: &str) -> String {
+/// Find the largest byte index <= max_bytes that is a valid char boundary.
+fn floor_char_boundary(s: &str, max_bytes: usize) -> usize {
+    if max_bytes >= s.len() {
+        return s.len();
+    }
+    let mut i = max_bytes;
+    while i > 0 && !s.is_char_boundary(i) {
+        i -= 1;
+    }
+    i
+}
+
+fn normalize_signature(sig: &str, max_sig_len: usize) -> String {
     let mut result = String::with_capacity(sig.len());
     let mut pending_space = false;
 
@@ -398,18 +427,20 @@ fn normalize_signature(sig: &str) -> String {
 
         if pending_space {
             pending_space = false;
-            let last = result.chars().last().unwrap();
-            let drop_after = matches!(last, '(' | '[' | '{' | '<' | ':' | ',');
-            let drop_before = matches!(c, ')' | ']' | '}' | '>' | ':' | ',');
-            if !drop_after && !drop_before {
-                result.push(' ');
+            if let Some(last) = result.chars().last() {
+                let drop_after = matches!(last, '(' | '[' | '{' | '<' | ':' | ',');
+                let drop_before = matches!(c, ')' | ']' | '}' | '>' | ':' | ',');
+                if !drop_after && !drop_before {
+                    result.push(' ');
+                }
             }
         }
         result.push(c);
     }
 
-    if result.len() > MAX_SIG_LEN {
-        let truncated = &result[..MAX_SIG_LEN];
+    if result.len() > max_sig_len {
+        let boundary = floor_char_boundary(&result, max_sig_len);
+        let truncated = &result[..boundary];
         if let Some(pos) = truncated.rfind([',', ')', '>']) {
             return format!("{}...", &truncated[..=pos]);
         }
@@ -421,28 +452,29 @@ fn normalize_signature(sig: &str) -> String {
 
 // ── Doc comment truncation ──
 
-fn truncate_doc(doc: &str) -> String {
+fn truncate_doc(doc: &str, max_doc_brief_len: usize) -> String {
     let trimmed = doc.trim();
 
     if let Some(dot_pos) = trimmed.find(". ") {
         let first_sentence = &trimmed[..=dot_pos];
-        if first_sentence.len() <= MAX_DOC_BRIEF_LEN {
+        if first_sentence.len() <= max_doc_brief_len {
             return first_sentence.to_string();
         }
     }
 
     if let Some(nl_pos) = trimmed.find('\n') {
         let first_line = trimmed[..nl_pos].trim();
-        if first_line.len() <= MAX_DOC_BRIEF_LEN {
+        if first_line.len() <= max_doc_brief_len {
             return first_line.to_string();
         }
     }
 
-    if trimmed.len() <= MAX_DOC_BRIEF_LEN {
+    if trimmed.len() <= max_doc_brief_len {
         return trimmed.to_string();
     }
 
-    let truncated = &trimmed[..MAX_DOC_BRIEF_LEN];
+    let boundary = floor_char_boundary(trimmed, max_doc_brief_len);
+    let truncated = &trimmed[..boundary];
     if let Some(space_pos) = truncated.rfind(' ') {
         return format!("{}...", &truncated[..space_pos]);
     }
@@ -454,46 +486,79 @@ fn truncate_doc(doc: &str) -> String {
 mod tests {
     use super::*;
 
+    const TEST_MAX_SIG: usize = 120;
+    const TEST_MAX_DOC: usize = 100;
+
     #[test]
     fn test_normalize_signature_strips_whitespace() {
         let sig = "(a: number, b: number): number";
-        let result = normalize_signature(sig);
+        let result = normalize_signature(sig, TEST_MAX_SIG);
         assert_eq!(result, "(a:number,b:number):number");
     }
 
     #[test]
     fn test_normalize_signature_preserves_ident_spaces() {
         let sig = "fn add(a int, b int) int";
-        let result = normalize_signature(sig);
+        let result = normalize_signature(sig, TEST_MAX_SIG);
         assert_eq!(result, "fn add(a int,b int) int");
     }
 
     #[test]
     fn test_normalize_signature_truncates() {
         let sig = "a".repeat(200);
-        let result = normalize_signature(&sig);
-        assert!(result.len() <= MAX_SIG_LEN + 3);
+        let result = normalize_signature(&sig, TEST_MAX_SIG);
+        assert!(result.len() <= TEST_MAX_SIG + 3);
         assert!(result.ends_with("..."));
+    }
+
+    #[test]
+    fn test_normalize_signature_utf8_boundary() {
+        // Emoji is 4 bytes — verify truncation doesn't panic
+        let sig = "fn f(".to_string() + &"\u{1F600}".repeat(50) + ")";
+        let result = normalize_signature(&sig, 20);
+        assert!(result.ends_with("..."));
+        assert!(result.is_char_boundary(result.len()));
     }
 
     #[test]
     fn test_truncate_doc_first_sentence() {
         let doc = "Adds two numbers. Returns the sum.";
-        assert_eq!(truncate_doc(doc), "Adds two numbers.");
+        assert_eq!(truncate_doc(doc, TEST_MAX_DOC), "Adds two numbers.");
     }
 
     #[test]
     fn test_truncate_doc_short() {
         let doc = "Simple doc";
-        assert_eq!(truncate_doc(doc), "Simple doc");
+        assert_eq!(truncate_doc(doc, TEST_MAX_DOC), "Simple doc");
     }
 
     #[test]
     fn test_truncate_doc_long() {
         let doc = "a ".repeat(100);
-        let result = truncate_doc(&doc);
-        assert!(result.len() <= MAX_DOC_BRIEF_LEN + 3);
+        let result = truncate_doc(&doc, TEST_MAX_DOC);
+        assert!(result.len() <= TEST_MAX_DOC + 3);
         assert!(result.ends_with("..."));
+    }
+
+    #[test]
+    fn test_truncate_doc_utf8_boundary() {
+        // CJK chars are 3 bytes each
+        let doc = "\u{4e16}\u{754c}".repeat(50); // "世界" repeated
+        let result = truncate_doc(&doc, 20);
+        assert!(result.ends_with("..."));
+        // Verify the result is valid UTF-8 (won't panic)
+        let _ = result.chars().count();
+    }
+
+    #[test]
+    fn test_floor_char_boundary() {
+        let s = "hello\u{1F600}world"; // emoji at byte 5, 4 bytes
+        assert_eq!(floor_char_boundary(s, 5), 5);
+        assert_eq!(floor_char_boundary(s, 6), 5); // inside emoji
+        assert_eq!(floor_char_boundary(s, 7), 5); // inside emoji
+        assert_eq!(floor_char_boundary(s, 8), 5); // inside emoji
+        assert_eq!(floor_char_boundary(s, 9), 9); // after emoji
+        assert_eq!(floor_char_boundary(s, 100), s.len());
     }
 
     #[test]

@@ -1,10 +1,15 @@
 [package]
 name = "ctxhelpr"
-version = "1.2.0"
+version = "0.0.0"
 edition = "2024"
 rust-version = "1.85"
 description = "Semantic code indexing MCP server for Claude Code"
 license = "MIT"
+repository = "https://github.com/rijuma/ctxhelpr"
+homepage = "https://github.com/rijuma/ctxhelpr"
+readme = "README.md"
+keywords = ["mcp", "code-indexing", "semantic", "tree-sitter", "claude"]
+categories = ["development-tools"]
 
 [dependencies]
 # MCP server

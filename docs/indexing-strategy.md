@@ -171,13 +171,13 @@ Signatures are normalized to save tokens:
 
 - Whitespace around `:`, `,`, and bracket openers is removed
 - `(a: number, b: number): number` becomes `(a:number,b:number):number`
-- Signatures longer than 120 characters are truncated with `...`
+- Signatures longer than 120 characters (configurable via `output.truncate_signatures`) are truncated with `...`
 
 ### Doc Comment Truncation
 
-In brief views (overview, search results, file symbols), doc comments are truncated:
+In brief views (overview, search results, file symbols), doc comments are truncated (limit configurable via `output.truncate_doc_comments`):
 
-- First sentence (ending with `. `) if under 100 characters
+- First sentence (ending with `. `) if under 100 characters (default)
 - First line if under 100 characters
 - Word-boundary truncation with `...` otherwise
 
@@ -196,7 +196,7 @@ Responses can be budget-constrained:
 
 ### Per-Repository Databases
 
-Each repository gets its own SQLite database at `~/.cache/ctxhelpr/<sha256-prefix>.db`. This avoids cross-repo interference and makes cleanup simple (delete the `.db` file).
+Each repository gets its own SQLite database at `~/.cache/ctxhelpr/<sha256-prefix>.db`. This avoids cross-repo interference and makes cleanup simple. Indexed repos can be listed and deleted via the `repos list` / `repos delete` CLI subcommands or the `list_repos` / `delete_repos` MCP tools.
 
 ### WAL Mode
 
@@ -235,6 +235,7 @@ This means FTS is always consistent with the symbols table without manual rebuil
 
 - Files that aren't valid UTF-8 in their path are skipped (`to_str()` returns `None`)
 - Binary files are read but typically produce no valid tree-sitter parse
+- Signature and doc comment truncation is UTF-8 safe — truncation points are snapped to valid character boundaries to avoid panics on multi-byte characters (emoji, CJK, accented chars)
 
 ### Duplicate Symbol Names
 
@@ -246,7 +247,7 @@ This means FTS is always consistent with the symbols table without manual rebuil
 
 ### Very Long Signatures
 
-- Signatures over 120 characters are truncated in brief views but preserved in full in detail views.
+- Signatures over the configured limit (default 120 characters) are truncated in brief views but preserved in full in detail views.
 
 ### Concurrent Access
 
@@ -262,6 +263,6 @@ This means FTS is always consistent with the symbols table without manual rebuil
 
 ### Large Monorepos
 
-- The 1 MiB file size limit prevents indexing minified bundles or large generated files
+- The file size limit (default 1 MiB, configurable via `indexer.max_file_size`) prevents indexing minified bundles or large generated files
 - The directory ignore list skips `node_modules`, `target`, etc.
 - Custom ignore patterns can be configured via `.ctxhelpr.json`

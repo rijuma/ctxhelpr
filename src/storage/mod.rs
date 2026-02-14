@@ -2,7 +2,7 @@ pub mod tokenizer;
 
 use anyhow::{Context, Result};
 use rusqlite::{Connection, params};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::indexer::{ExtractedRef, ExtractedSymbol};
 
@@ -146,6 +146,137 @@ pub fn db_path_for_repo(repo_path: &str) -> PathBuf {
         .join(format!("{}.db", short_hash))
 }
 
+fn cache_dir() -> PathBuf {
+    let dir = dirs::cache_dir().unwrap_or_else(|| PathBuf::from("/tmp"));
+    dir.join("ctxhelpr")
+}
+
+#[derive(Debug, Clone)]
+#[allow(dead_code)] // Fields available for future CLI and MCP tool output
+pub struct RepoInfo {
+    pub abs_path: String,
+    pub last_indexed_at: Option<String>,
+    pub created_at: String,
+    pub file_count: i64,
+    pub symbol_count: i64,
+    pub db_path: PathBuf,
+    pub db_size_bytes: u64,
+}
+
+/// List all indexed repos by scanning cache directory DB files.
+pub fn list_indexed_repos() -> Result<Vec<RepoInfo>> {
+    let dir = cache_dir();
+    if !dir.exists() {
+        return Ok(Vec::new());
+    }
+
+    let mut repos = Vec::new();
+    for entry in std::fs::read_dir(&dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) != Some("db") {
+            continue;
+        }
+
+        let conn = match Connection::open(&path) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+
+        // Check if this is a ctxhelpr database with the repositories table
+        let has_repos: bool = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='repositories'",
+                [],
+                |row| row.get::<_, i64>(0),
+            )
+            .map(|c| c > 0)
+            .unwrap_or(false);
+
+        if !has_repos {
+            continue;
+        }
+
+        let mut stmt =
+            match conn.prepare("SELECT abs_path, last_indexed_at, created_at FROM repositories") {
+                Ok(s) => s,
+                Err(_) => continue,
+            };
+
+        let rows: Vec<(String, Option<String>, String)> = stmt
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
+            .ok()
+            .map(|r| r.filter_map(|r| r.ok()).collect())
+            .unwrap_or_default();
+
+        for (abs_path, last_indexed_at, created_at) in rows {
+            let file_count: i64 = conn
+                .query_row("SELECT COUNT(*) FROM files", [], |row| row.get(0))
+                .unwrap_or(0);
+            let symbol_count: i64 = conn
+                .query_row("SELECT COUNT(*) FROM symbols", [], |row| row.get(0))
+                .unwrap_or(0);
+            let db_size_bytes = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+
+            repos.push(RepoInfo {
+                abs_path,
+                last_indexed_at,
+                created_at,
+                file_count,
+                symbol_count,
+                db_path: path.clone(),
+                db_size_bytes,
+            });
+        }
+    }
+
+    repos.sort_by(|a, b| a.abs_path.cmp(&b.abs_path));
+    Ok(repos)
+}
+
+/// Delete a repo's index (remove DB file and WAL/SHM files).
+pub fn delete_repo_index(repo_path: &str) -> Result<()> {
+    let db_path = db_path_for_repo(repo_path);
+    if !db_path.exists() {
+        anyhow::bail!("No index found for {repo_path}");
+    }
+    remove_db_files(&db_path)
+}
+
+/// Delete all indexed repos (remove all DB files in cache dir).
+pub fn delete_all_repo_indexes() -> Result<usize> {
+    let dir = cache_dir();
+    if !dir.exists() {
+        return Ok(0);
+    }
+
+    let mut count = 0;
+    for entry in std::fs::read_dir(&dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) == Some("db") {
+            remove_db_files(&path)?;
+            count += 1;
+        }
+    }
+    Ok(count)
+}
+
+fn remove_db_files(db_path: &Path) -> Result<()> {
+    if db_path.exists() {
+        std::fs::remove_file(db_path)?;
+    }
+    let shm = db_path.with_extension("db-shm");
+    if shm.exists() {
+        std::fs::remove_file(shm)?;
+    }
+    let wal = db_path.with_extension("db-wal");
+    if wal.exists() {
+        std::fs::remove_file(wal)?;
+    }
+    Ok(())
+}
+
 pub struct SqliteStorage {
     conn: Connection,
 }
@@ -232,14 +363,24 @@ impl SqliteStorage {
 
     fn has_column(&self, table: &str, column: &str) -> bool {
         self.conn
-            .prepare(&format!("SELECT {column} FROM {table} LIMIT 0"))
-            .is_ok()
+            .query_row(
+                "SELECT COUNT(*) FROM pragma_table_info(?) WHERE name = ?",
+                params![table, column],
+                |row| row.get::<_, i64>(0),
+            )
+            .map(|count| count > 0)
+            .unwrap_or(false)
     }
 
     fn has_table(&self, table: &str) -> bool {
         self.conn
-            .prepare(&format!("SELECT 1 FROM {table} LIMIT 0"))
-            .is_ok()
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name = ?",
+                params![table],
+                |row| row.get::<_, i64>(0),
+            )
+            .map(|count| count > 0)
+            .unwrap_or(false)
     }
 
     // ── Transaction control ──
@@ -494,6 +635,17 @@ impl SqliteStorage {
         anyhow::ensure!(
             VALID_COLUMNS.contains(&column),
             "Invalid column for symbol query: {column}"
+        );
+
+        const VALID_ORDER_BY: &[&str] = &[
+            "",
+            "ORDER BY (end_line - start_line) DESC",
+            "ORDER BY start_line",
+            "ORDER BY name",
+        ];
+        anyhow::ensure!(
+            VALID_ORDER_BY.contains(&order_by),
+            "Invalid order_by clause: {order_by}"
         );
 
         let placeholders: Vec<String> = (0..values.len()).map(|i| format!("?{}", i + 2)).collect();

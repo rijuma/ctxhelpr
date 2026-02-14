@@ -3,7 +3,7 @@ use serde_json::Value;
 use std::fs;
 use std::path::Path;
 
-pub const TOOL_PERMISSIONS: [&str; 9] = [
+pub const TOOL_PERMISSIONS: [&str; 11] = [
     "mcp__ctxhelpr__index_repository",
     "mcp__ctxhelpr__update_files",
     "mcp__ctxhelpr__get_overview",
@@ -13,9 +13,11 @@ pub const TOOL_PERMISSIONS: [&str; 9] = [
     "mcp__ctxhelpr__get_references",
     "mcp__ctxhelpr__get_dependencies",
     "mcp__ctxhelpr__index_status",
+    "mcp__ctxhelpr__list_repos",
+    "mcp__ctxhelpr__delete_repos",
 ];
 
-pub const TOOL_LABELS: [&str; 9] = [
+pub const TOOL_LABELS: [&str; 11] = [
     "index_repository  - Full index/re-index",
     "update_files      - Re-index specific files after edits",
     "get_overview      - High-level repo structure",
@@ -25,6 +27,8 @@ pub const TOOL_LABELS: [&str; 9] = [
     "get_references    - Who references a symbol",
     "get_dependencies  - What a symbol depends on",
     "index_status      - Check index freshness",
+    "list_repos        - List all indexed repositories",
+    "delete_repos      - Delete repository index data",
 ];
 
 pub fn read_settings(path: &Path) -> Result<Value> {
@@ -69,11 +73,11 @@ pub fn set_grants(path: &Path, grants: &[bool]) -> Result<()> {
 }
 
 pub fn grant_all(path: &Path) -> Result<()> {
-    set_grants(path, &[true; 9])
+    set_grants(path, &[true; 11])
 }
 
 pub fn revoke_all(path: &Path) -> Result<()> {
-    set_grants(path, &[false; 9])
+    set_grants(path, &[false; 11])
 }
 
 fn apply_grants(settings: &mut Value, grants: &[bool]) {
@@ -114,10 +118,10 @@ mod tests {
     #[test]
     fn grant_all_to_empty_settings() {
         let mut settings = json!({});
-        apply_grants(&mut settings, &[true; 9]);
+        apply_grants(&mut settings, &[true; 11]);
 
         let allow = settings["permissions"]["allow"].as_array().unwrap();
-        assert_eq!(allow.len(), 9);
+        assert_eq!(allow.len(), 11);
         for perm in &TOOL_PERMISSIONS {
             assert!(allow.contains(&json!(perm)));
         }
@@ -132,10 +136,10 @@ mod tests {
             },
             "other_key": true
         });
-        apply_grants(&mut settings, &[true; 9]);
+        apply_grants(&mut settings, &[true; 11]);
 
         let allow = settings["permissions"]["allow"].as_array().unwrap();
-        assert_eq!(allow.len(), 11); // 2 existing + 9 ctxhelpr
+        assert_eq!(allow.len(), 13); // 2 existing + 11 ctxhelpr
         assert!(allow.contains(&json!("mcp__other__tool")));
         assert!(allow.contains(&json!("some_permission")));
         assert_eq!(settings["permissions"]["deny"][0], "something");
@@ -154,7 +158,7 @@ mod tests {
                 ]
             }
         });
-        apply_grants(&mut settings, &[false; 9]);
+        apply_grants(&mut settings, &[false; 11]);
 
         let allow = settings["permissions"]["allow"].as_array().unwrap();
         assert_eq!(allow.len(), 2);
@@ -165,7 +169,7 @@ mod tests {
     #[test]
     fn selective_grants() {
         let mut settings = json!({});
-        let mut grants = [false; 9];
+        let mut grants = [false; 11];
         grants[0] = true; // index_repository
         grants[2] = true; // get_overview
         grants[5] = true; // search_symbols
@@ -186,10 +190,10 @@ mod tests {
     #[test]
     fn idempotent_grant_no_duplicates() {
         let mut settings = json!({});
-        apply_grants(&mut settings, &[true; 9]);
-        apply_grants(&mut settings, &[true; 9]);
+        apply_grants(&mut settings, &[true; 11]);
+        apply_grants(&mut settings, &[true; 11]);
 
         let allow = settings["permissions"]["allow"].as_array().unwrap();
-        assert_eq!(allow.len(), 9);
+        assert_eq!(allow.len(), 11);
     }
 }
