@@ -4,7 +4,7 @@ This file provides guidance to coding agents when working with code in this repo
 
 ## What This Is
 
-ctxhelpr is an MCP server that semantically indexes codebases using tree-sitter, stores symbols/references in SQLite with FTS5, and exposes 9 tools for Claude Code (Initially) to navigate code structurally instead of reading raw files. Written in Rust.
+ctxhelpr is an MCP server that semantically indexes codebases using tree-sitter, stores symbols/references in SQLite with FTS5, and exposes 11 tools for Claude Code (Initially) to navigate code structurally instead of reading raw files. Written in Rust.
 
 If successful, this project will extend to other coding agents.
 
@@ -27,7 +27,7 @@ cargo test test_name -- --nocapture  # Run with stdout/stderr visible
 RUST_LOG=ctxhelpr=debug cargo run -- serve   # Run MCP server with debug logging
 ```
 
-The binary has four subcommands: `serve` (MCP stdio server), `install` (register with Claude Code), `uninstall` (remove integration), `perms` (manage tool permissions).
+ctxhelpr has six subcommands: `serve` (MCP stdio server), `install` (register with Claude Code), `uninstall` (remove integration), `perms` (manage tool permissions), `config` (project configuration), `repos` (manage indexed repositories).
 
 ## Architecture
 
@@ -37,7 +37,7 @@ Key modules:
 
 - **`mcp/`** — `CtxhelprServer` implements `ServerHandler` via rmcp macros (`#[tool_router]`, `#[tool_handler]`, `#[tool]`). Each MCP tool is a method. All tools take a repo path and open storage on demand. All handlers log at `tracing::info!` on entry with relevant parameters.
 - **`indexer/`** — `Indexer` walks the repo, delegates to language extractors via the `LanguageExtractor` trait, handles incremental re-indexing via SHA256 content hashing. `ExtractedSymbol` trees are recursive (children + references).
-- **`indexer/languages/`** — One module per language. Currently only `typescript.rs` is implemented. Each extractor returns `Vec<ExtractedSymbol>` from tree-sitter AST traversal. Python and Rust extractors are planned (dependencies already in Cargo.toml).
+- **`indexer/languages/`** — One module per language (TypeScript, Python, Rust, Ruby, Markdown). Each extractor returns `Vec<ExtractedSymbol>` from tree-sitter AST traversal.
 - **`storage/`** — `SqliteStorage` wraps rusqlite. Schema is in `schema.sql` (loaded via `include_str!`). DB is per-repo, stored at `~/.cache/ctxhelpr/<hash>.db`. FTS5 virtual table with triggers keeps full-text index in sync. Provides `begin_transaction()`/`commit()` for batching — the indexer wraps all operations in a single transaction for performance.
 - **`output/`** — `CompactFormatter` produces token-efficient JSON with short keys (`n`, `k`, `f`, `l`, `sig`, `doc`, `id`).
 - **`cli/`** — `install.rs` registers the MCP server, installs a skill file and `/index` command into `~/.claude/`. `uninstall.rs` reverses this.
@@ -69,4 +69,12 @@ Uses Rust edition 2024 (`edition = "2024"` in Cargo.toml), requiring rustc 1.85+
 
 ## Documentation
 
-`README.md` (English) and `README.es.md` (Spanish) must always be kept in sync. When updating one, update the other with the same structural and content changes. The English version is the source of truth.
+All documentation files have English (`.md`) and Spanish (`.es.md`) versions.
+When updating any documentation file, update both language versions with the
+same structural and content changes. English is the source of truth.
+
+Documentation structure:
+- `README.md` / `README.es.md` — Project overview and quick start
+- `docs/user-guide.md` / `docs/user-guide.es.md` — Configuration, tools reference, CLI details
+- `docs/developer-guide.md` / `docs/developer-guide.es.md` — Building, architecture, contributing
+- `docs/indexing-strategy.md` / `docs/indexing-strategy.es.md` — Indexing architecture deep dive
