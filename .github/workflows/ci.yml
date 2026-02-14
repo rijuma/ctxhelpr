@@ -31,3 +31,12 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo fmt --all -- --check
       - run: cargo clippy --all-targets -- -D warnings
+
+  shellcheck:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ludeeus/action-shellcheck@2.0.0
+        with:
+          scandir: scripts/
