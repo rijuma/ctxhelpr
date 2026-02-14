@@ -229,7 +229,7 @@ impl ConfigCache {
     }
 
     pub fn get(&self, repo_path: &str) -> Config {
-        let mut cache = self.cache.lock().unwrap();
+        let mut cache = self.cache.lock().unwrap_or_else(|e| e.into_inner());
         if let Some(config) = cache.get(repo_path) {
             return config.clone();
         }

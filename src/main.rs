@@ -11,6 +11,7 @@ mod storage;
 
 use cli::Scope;
 use cli::config_cmd::ConfigArgs;
+use cli::repos::ReposCommands;
 
 #[derive(Parser)]
 #[command(name = "ctxhelpr", about = "Semantic code indexing for Claude Code")]
@@ -31,6 +32,11 @@ enum Commands {
     Perms(PermsArgs),
     /// Manage project configuration (.ctxhelpr.json)
     Config(ConfigArgs),
+    /// Manage indexed repositories
+    Repos {
+        #[command(subcommand)]
+        command: ReposCommands,
+    },
 }
 
 #[derive(Args)]
@@ -88,6 +94,7 @@ async fn main() -> Result<()> {
         Some(Commands::Uninstall(args)) => cli::uninstall::run(args.into_scope()),
         Some(Commands::Perms(args)) => cli::perms::run(args.scope(), args.all, args.remove),
         Some(Commands::Config(args)) => cli::config_cmd::run(args),
+        Some(Commands::Repos { command }) => cli::repos::run(command),
         None => {
             Cli::command().print_help()?;
             Ok(())

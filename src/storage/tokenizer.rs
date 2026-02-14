@@ -33,9 +33,9 @@ pub fn split_code_identifier(name: &str) -> String {
                     words.push(std::mem::take(&mut current));
                 }
             }
-            current.push(c.to_lowercase().next().unwrap());
+            current.push(c.to_ascii_lowercase());
         } else {
-            current.push(c.to_lowercase().next().unwrap());
+            current.push(c.to_ascii_lowercase());
         }
     }
 

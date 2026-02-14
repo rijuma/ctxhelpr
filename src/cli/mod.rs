@@ -2,6 +2,7 @@ pub mod config_cmd;
 pub mod install;
 pub mod permissions;
 pub mod perms;
+pub mod repos;
 pub mod uninstall;
 
 use anyhow::Result;

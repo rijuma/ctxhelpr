@@ -8,10 +8,10 @@ use schemars::JsonSchema;
 use serde::Deserialize;
 use std::sync::Arc;
 
-use crate::config::ConfigCache;
+use crate::config::{ConfigCache, OutputConfig};
 use crate::indexer::Indexer;
 use crate::output::{CompactFormatter, OutputFormatter, TokenBudget};
-use crate::storage::SqliteStorage;
+use crate::storage::{self, SqliteStorage};
 
 type McpError = rmcp::ErrorData;
 
@@ -54,6 +54,18 @@ pub struct SymbolIdParams {
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
+pub struct ListReposParams {
+    /// Optional token budget — limits response size (approximate, 1 token ≈ 4 bytes)
+    pub max_tokens: Option<usize>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct DeleteReposParams {
+    /// Absolute paths of repositories to delete indexes for. If empty, does nothing.
+    pub paths: Vec<String>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
 pub struct SearchParams {
     /// Absolute path to the repository root
     pub path: String,
@@ -76,10 +88,13 @@ fn apply_budget(output: String, max_tokens: Option<usize>, array_key: &str) -> S
 
 // ── Server ────────────────────────────────────────────────
 
+fn formatter(config: &OutputConfig) -> CompactFormatter {
+    CompactFormatter::new(config)
+}
+
 #[derive(Clone)]
 pub struct CtxhelprServer {
     indexer: Arc<Indexer>,
-    formatter: Arc<dyn OutputFormatter>,
     config_cache: Arc<ConfigCache>,
     tool_router: ToolRouter<Self>,
 }
@@ -94,7 +109,6 @@ impl CtxhelprServer {
     pub fn new() -> Self {
         Self {
             indexer: Arc::new(Indexer::new()),
-            formatter: Arc::new(CompactFormatter),
             config_cache: Arc::new(ConfigCache::new()),
             tool_router: Self::tool_router(),
         }
@@ -110,12 +124,18 @@ impl CtxhelprServer {
         tracing::info!(path = %params.path, "index_repository");
         let config = self.config_cache.get(&params.path);
         let storage = open_storage(&params.path)?;
+        let fmt = formatter(&config.output);
         let stats = self
             .indexer
-            .index(&params.path, &storage, &config.indexer.ignore)
+            .index(
+                &params.path,
+                &storage,
+                &config.indexer.ignore,
+                config.indexer.max_file_size,
+            )
             .map_err(|e| McpError::internal_error(format!("Indexing failed: {e}"), None))?;
         Ok(CallToolResult::success(vec![Content::text(
-            self.formatter.format_index_result(&stats),
+            fmt.format_index_result(&stats),
         )]))
     }
 
@@ -129,6 +149,7 @@ impl CtxhelprServer {
         tracing::info!(path = %params.path, file_count = params.files.len(), "update_files");
         let config = self.config_cache.get(&params.path);
         let storage = open_storage(&params.path)?;
+        let fmt = formatter(&config.output);
         let stats = self
             .indexer
             .update_files(
@@ -136,10 +157,11 @@ impl CtxhelprServer {
                 &params.files,
                 &storage,
                 &config.indexer.ignore,
+                config.indexer.max_file_size,
             )
             .map_err(|e| McpError::internal_error(format!("Update failed: {e}"), None))?;
         Ok(CallToolResult::success(vec![Content::text(
-            self.formatter.format_update_result(&stats),
+            fmt.format_update_result(&stats),
         )]))
     }
 
@@ -153,11 +175,12 @@ impl CtxhelprServer {
         tracing::info!(path = %params.path, "get_overview");
         let config = self.config_cache.get(&params.path);
         let storage = open_storage(&params.path)?;
+        let fmt = formatter(&config.output);
         let data = storage
             .get_overview(&params.path)
             .map_err(|e| McpError::internal_error(format!("Query failed: {e}"), None))?;
         let budget = resolve_budget(params.max_tokens, config.output.max_tokens);
-        let output = apply_budget(self.formatter.format_overview(&data), budget, "top_types");
+        let output = apply_budget(fmt.format_overview(&data), budget, "top_types");
         Ok(CallToolResult::success(vec![Content::text(output)]))
     }
 
@@ -171,12 +194,13 @@ impl CtxhelprServer {
         tracing::info!(path = %params.path, file = %params.file, "get_file_symbols");
         let config = self.config_cache.get(&params.path);
         let storage = open_storage(&params.path)?;
+        let fmt = formatter(&config.output);
         let symbols = storage
             .get_file_symbols(&params.path, &params.file)
             .map_err(|e| McpError::internal_error(format!("Query failed: {e}"), None))?;
         let budget = resolve_budget(params.max_tokens, config.output.max_tokens);
         let output = apply_budget(
-            self.formatter.format_file_symbols(&params.file, &symbols),
+            fmt.format_file_symbols(&params.file, &symbols),
             budget,
             "syms",
         );
@@ -193,6 +217,7 @@ impl CtxhelprServer {
         tracing::info!(path = %params.path, symbol_id = params.symbol_id, "get_symbol_detail");
         let config = self.config_cache.get(&params.path);
         let storage = open_storage(&params.path)?;
+        let fmt = formatter(&config.output);
         let sym = storage
             .get_symbol_detail(&params.path, params.symbol_id)
             .map_err(|e| McpError::internal_error(format!("Query failed: {e}"), None))?;
@@ -211,8 +236,7 @@ impl CtxhelprServer {
         let type_refs = Vec::new();
         let budget = resolve_budget(params.max_tokens, config.output.max_tokens);
         let output = apply_budget(
-            self.formatter
-                .format_symbol_detail(&sym, &calls, &called_by, &type_refs),
+            fmt.format_symbol_detail(&sym, &calls, &called_by, &type_refs),
             budget,
             "called_by",
         );
@@ -229,14 +253,14 @@ impl CtxhelprServer {
         tracing::info!(path = %params.path, query = %params.query, "search_symbols");
         let config = self.config_cache.get(&params.path);
         let storage = open_storage(&params.path)?;
+        let fmt = formatter(&config.output);
         let mut results = storage
             .search_symbols(&params.path, &params.query)
             .map_err(|e| McpError::internal_error(format!("Search failed: {e}"), None))?;
         results.truncate(config.search.max_results);
         let budget = resolve_budget(params.max_tokens, config.output.max_tokens);
         let output = apply_budget(
-            self.formatter
-                .format_search_results(&params.query, &results),
+            fmt.format_search_results(&params.query, &results),
             budget,
             "hits",
         );
@@ -253,12 +277,13 @@ impl CtxhelprServer {
         tracing::info!(path = %params.path, symbol_id = params.symbol_id, "get_references");
         let config = self.config_cache.get(&params.path);
         let storage = open_storage(&params.path)?;
+        let fmt = formatter(&config.output);
         let refs = storage
             .get_references(&params.path, params.symbol_id)
             .map_err(|e| McpError::internal_error(format!("Query failed: {e}"), None))?;
         let budget = resolve_budget(params.max_tokens, config.output.max_tokens);
         let output = apply_budget(
-            self.formatter.format_references(params.symbol_id, &refs),
+            fmt.format_references(params.symbol_id, &refs),
             budget,
             "refs_to",
         );
@@ -275,12 +300,13 @@ impl CtxhelprServer {
         tracing::info!(path = %params.path, symbol_id = params.symbol_id, "get_dependencies");
         let config = self.config_cache.get(&params.path);
         let storage = open_storage(&params.path)?;
+        let fmt = formatter(&config.output);
         let deps = storage
             .get_dependencies(&params.path, params.symbol_id)
             .map_err(|e| McpError::internal_error(format!("Query failed: {e}"), None))?;
         let budget = resolve_budget(params.max_tokens, config.output.max_tokens);
         let output = apply_budget(
-            self.formatter.format_dependencies(params.symbol_id, &deps),
+            fmt.format_dependencies(params.symbol_id, &deps),
             budget,
             "deps",
         );
@@ -295,12 +321,78 @@ impl CtxhelprServer {
         Parameters(params): Parameters<RepoPathParams>,
     ) -> Result<CallToolResult, McpError> {
         tracing::info!(path = %params.path, "index_status");
+        let config = self.config_cache.get(&params.path);
         let storage = open_storage(&params.path)?;
+        let fmt = formatter(&config.output);
         let status = storage
             .get_index_status(&params.path)
             .map_err(|e| McpError::internal_error(format!("Status failed: {e}"), None))?;
         Ok(CallToolResult::success(vec![Content::text(
-            self.formatter.format_index_status(&status),
+            fmt.format_index_status(&status),
+        )]))
+    }
+
+    #[tool(
+        description = "List all indexed repositories with stats: path, last indexed time, file/symbol counts, database size."
+    )]
+    async fn list_repos(
+        &self,
+        Parameters(params): Parameters<ListReposParams>,
+    ) -> Result<CallToolResult, McpError> {
+        tracing::info!("list_repos");
+        let repos = storage::list_indexed_repos()
+            .map_err(|e| McpError::internal_error(format!("Failed to list repos: {e}"), None))?;
+
+        let items: Vec<serde_json::Value> = repos
+            .iter()
+            .map(|r| {
+                let mut v = serde_json::json!({
+                    "path": r.abs_path,
+                    "files": r.file_count,
+                    "symbols": r.symbol_count,
+                    "db_size": r.db_size_bytes,
+                });
+                if let Some(at) = &r.last_indexed_at {
+                    v["last_indexed"] = serde_json::json!(at);
+                }
+                v
+            })
+            .collect();
+
+        let output = serde_json::json!({"repos": items, "total": repos.len()}).to_string();
+        let output = apply_budget(output, params.max_tokens, "repos");
+        Ok(CallToolResult::success(vec![Content::text(output)]))
+    }
+
+    #[tool(
+        description = "Delete indexed repository data. Removes the database files for the specified repositories."
+    )]
+    async fn delete_repos(
+        &self,
+        Parameters(params): Parameters<DeleteReposParams>,
+    ) -> Result<CallToolResult, McpError> {
+        tracing::info!(count = params.paths.len(), "delete_repos");
+        if params.paths.is_empty() {
+            return Ok(CallToolResult::success(vec![Content::text(
+                r#"{"deleted":0}"#.to_string(),
+            )]));
+        }
+
+        let mut deleted = 0;
+        let mut errors: Vec<String> = Vec::new();
+        for path in &params.paths {
+            match storage::delete_repo_index(path) {
+                Ok(()) => deleted += 1,
+                Err(e) => errors.push(format!("{path}: {e}")),
+            }
+        }
+
+        let mut result = serde_json::json!({"deleted": deleted});
+        if !errors.is_empty() {
+            result["errors"] = serde_json::json!(errors);
+        }
+        Ok(CallToolResult::success(vec![Content::text(
+            result.to_string(),
         )]))
     }
 }
@@ -317,6 +409,8 @@ impl ServerHandler for CtxhelprServer {
                  Workflow: index_repository -> get_overview -> drill with \
                  get_file_symbols/get_symbol_detail/search_symbols. \
                  After edits, call update_files to keep index fresh. \
+                 Use list_repos to see all indexed repositories, \
+                 delete_repos to remove index data. \
                  Output key legend: n=name k=kind f=file l=lines(start-end) \
                  id=symbol_id sig=signature doc=doc_comment p=path"
                     .into(),

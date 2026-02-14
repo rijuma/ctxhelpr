@@ -27,8 +27,6 @@ const DEFAULT_IGNORE: &[&str] = &[
 
 const DEFAULT_IGNORE_SUFFIXES: &[&str] = &[".min.js", ".min.mjs", ".min.cjs", ".min.css"];
 
-const MAX_FILE_SIZE: u64 = 1_048_576; // 1MB
-
 #[derive(Debug, Clone)]
 pub struct ExtractedSymbol {
     pub name: String,
@@ -167,6 +165,7 @@ impl Indexer {
         repo_path: &str,
         storage: &SqliteStorage,
         ignore_patterns: &[String],
+        max_file_size: u64,
     ) -> Result<IndexStats> {
         let start = Instant::now();
         let abs_path = std::fs::canonicalize(repo_path)
@@ -209,7 +208,7 @@ impl Indexer {
             };
 
             if let Ok(meta) = entry.metadata() {
-                if meta.len() > MAX_FILE_SIZE {
+                if meta.len() > max_file_size {
                     continue;
                 }
             }
@@ -281,6 +280,7 @@ impl Indexer {
         files: &[String],
         storage: &SqliteStorage,
         ignore_patterns: &[String],
+        max_file_size: u64,
     ) -> Result<IndexStats> {
         let start = Instant::now();
         let abs_path = std::fs::canonicalize(repo_path)?;
@@ -303,6 +303,12 @@ impl Indexer {
             let full_path = abs_path.join(rel_path);
             if !full_path.exists() {
                 continue;
+            }
+
+            if let Ok(meta) = std::fs::metadata(&full_path) {
+                if meta.len() > max_file_size {
+                    continue;
+                }
             }
 
             let ext = match full_path.extension().and_then(|e| e.to_str()) {

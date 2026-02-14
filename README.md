@@ -24,7 +24,7 @@ If you encounter issues, have suggestions, or want to share your experience, ple
 
 1. **Indexes your repo** using [tree-sitter](https://tree-sitter.github.io/) to extract symbols, their relationships, and documentation
 2. **Stores everything** in a per-repo SQLite database with FTS5 full-text search
-3. **Exposes 9 MCP tools** that Claude Code uses to navigate your code semantically
+3. **Exposes 11 MCP tools** that Claude Code uses to navigate and manage your code index
 4. **Incremental re-indexing** - only re-parses files that actually changed (SHA256 content hashing)
 
 ### MCP Tools
@@ -40,6 +40,8 @@ If you encounter issues, have suggestions, or want to share your experience, ple
 | `get_references`    | Who references a given symbol                            |
 | `get_dependencies`  | What a symbol depends on                                 |
 | `index_status`      | Check index freshness and detect stale files             |
+| `list_repos`        | List all indexed repositories with stats                 |
+| `delete_repos`      | Delete index data for specified repositories             |
 
 ## Language support
 
@@ -104,7 +106,7 @@ Registers the MCP server, installs the skill file and `/index` command, prompts 
 ctxhelpr uninstall [-l | -g]
 ```
 
-Removes all integrations and revokes tool permissions.
+Removes all integrations and revokes tool permissions. Prompts to delete index databases: local uninstall offers to delete the current repo's DB (default: yes), global uninstall offers to delete all DBs (default: no).
 
 ### Manage permissions
 
@@ -199,6 +201,8 @@ ctxhelpr perms [-l | -g] [-a | -r]          # Manage permissions
 ctxhelpr config init                        # Create .ctxhelpr.json template
 ctxhelpr config validate [--path dir]       # Validate config file
 ctxhelpr config show [--path dir]           # Show resolved config
+ctxhelpr repos list                         # List all indexed repositories
+ctxhelpr repos delete [paths...]            # Delete index data (interactive if no paths)
 ```
 
 `serve` is not meant to be run manually. Claude Code spawns it via stdio; it stops automatically when the session ends.
@@ -229,7 +233,7 @@ cargo build --release
 src/
 ├── main.rs                 # CLI entry point
 ├── config.rs               # Project configuration (.ctxhelpr.json)
-├── cli/                    # install, uninstall, perms & permissions
+├── cli/                    # install, uninstall, perms, permissions & repos
 ├── server/                 # MCP server (stdio transport)
 ├── mcp/                    # Tool definitions and handlers
 ├── indexer/                # Core indexing logic + language extractors

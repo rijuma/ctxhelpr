@@ -32,7 +32,7 @@ fn index_lang_fixtures(path: PathBuf) -> (SqliteStorage, String) {
     let path_str = path.to_str().unwrap().to_string();
     let indexer = Indexer::new();
     let stats = indexer
-        .index(&path_str, &storage, &[])
+        .index(&path_str, &storage, &[], u64::MAX)
         .expect("Indexing failed");
     assert!(stats.files_total > 0, "No files were processed");
     assert!(stats.symbols_count > 0, "No symbols were extracted");
@@ -45,7 +45,7 @@ fn index_fixtures() -> (SqliteStorage, String) {
     let path_str = path.to_str().unwrap().to_string();
     let indexer = Indexer::new();
     let stats = indexer
-        .index(&path_str, &storage, &[])
+        .index(&path_str, &storage, &[], u64::MAX)
         .expect("Indexing failed");
     assert!(stats.files_total > 0, "No files were processed");
     assert!(stats.symbols_count > 0, "No symbols were extracted");
@@ -60,7 +60,7 @@ fn test_index_repository() {
     let indexer = Indexer::new();
 
     let stats = indexer
-        .index(path_str, &storage, &[])
+        .index(path_str, &storage, &[], u64::MAX)
         .expect("Indexing failed");
 
     assert_eq!(stats.files_total, 4, "Should index 4 TypeScript files");
@@ -78,13 +78,13 @@ fn test_incremental_reindex() {
 
     // First index
     let stats1 = indexer
-        .index(path_str, &storage, &[])
+        .index(path_str, &storage, &[], u64::MAX)
         .expect("First index failed");
     assert!(stats1.files_total > 0);
 
     // Second index - same files, nothing changed
     let stats2 = indexer
-        .index(path_str, &storage, &[])
+        .index(path_str, &storage, &[], u64::MAX)
         .expect("Second index failed");
     assert_eq!(
         stats2.files_unchanged, stats1.files_total,
@@ -337,7 +337,7 @@ fn test_compact_output() {
     let overview = storage
         .get_overview(&path_str)
         .expect("get_overview failed");
-    let fmt = ctxhelpr::output::CompactFormatter;
+    let fmt = ctxhelpr::output::CompactFormatter::new(&ctxhelpr::config::OutputConfig::default());
     let output = ctxhelpr::output::OutputFormatter::format_overview(&fmt, &overview);
 
     // Should be valid JSON
@@ -365,7 +365,7 @@ fn test_file_symbols_compact_output() {
     let symbols = storage
         .get_file_symbols(&path_str, "simple.ts")
         .expect("get_file_symbols failed");
-    let fmt = ctxhelpr::output::CompactFormatter;
+    let fmt = ctxhelpr::output::CompactFormatter::new(&ctxhelpr::config::OutputConfig::default());
     let output =
         ctxhelpr::output::OutputFormatter::format_file_symbols(&fmt, "simple.ts", &symbols);
 
@@ -396,7 +396,13 @@ fn test_update_files() {
     let (storage, path_str) = index_fixtures();
 
     let stats = Indexer::new()
-        .update_files(&path_str, &["simple.ts".to_string()], &storage, &[])
+        .update_files(
+            &path_str,
+            &["simple.ts".to_string()],
+            &storage,
+            &[],
+            u64::MAX,
+        )
         .expect("update_files failed");
 
     assert_eq!(stats.files_changed, 1, "Should update 1 file");
@@ -413,6 +419,7 @@ fn test_update_files_nonexistent_file() {
             &["nonexistent_file.ts".to_string()],
             &storage,
             &[],
+            u64::MAX,
         )
         .expect("update_files should handle missing files gracefully");
 
@@ -428,7 +435,7 @@ fn test_index_empty_directory() {
     let indexer = Indexer::new();
 
     let stats = indexer
-        .index(path_str, &storage, &[])
+        .index(path_str, &storage, &[], u64::MAX)
         .expect("Indexing empty dir failed");
 
     assert_eq!(stats.files_total, 0, "No files in empty dir");
@@ -492,7 +499,7 @@ fn test_python_index_repository() {
     let indexer = Indexer::new();
 
     let stats = indexer
-        .index(path_str, &storage, &[])
+        .index(path_str, &storage, &[], u64::MAX)
         .expect("Indexing failed");
 
     assert_eq!(stats.files_total, 1, "Should index 1 Python file");
@@ -618,7 +625,7 @@ fn test_rust_index_repository() {
     let indexer = Indexer::new();
 
     let stats = indexer
-        .index(path_str, &storage, &[])
+        .index(path_str, &storage, &[], u64::MAX)
         .expect("Indexing failed");
 
     assert_eq!(stats.files_total, 1, "Should index 1 Rust file");
@@ -801,7 +808,7 @@ fn test_ruby_index_repository() {
     let indexer = Indexer::new();
 
     let stats = indexer
-        .index(path_str, &storage, &[])
+        .index(path_str, &storage, &[], u64::MAX)
         .expect("Indexing failed");
 
     assert_eq!(stats.files_total, 1, "Should index 1 Ruby file");
@@ -994,7 +1001,7 @@ fn test_markdown_index_repository() {
     let indexer = Indexer::new();
 
     let stats = indexer
-        .index(path_str, &storage, &[])
+        .index(path_str, &storage, &[], u64::MAX)
         .expect("Indexing failed");
 
     assert_eq!(stats.files_total, 1, "Should index 1 Markdown file");
@@ -1074,7 +1081,7 @@ fn test_minified_files_skipped_by_default() {
     let indexer = Indexer::new();
 
     let stats = indexer
-        .index(path_str, &storage, &[])
+        .index(path_str, &storage, &[], u64::MAX)
         .expect("Indexing failed");
 
     // vendor.min.js exists in fixtures but should be skipped
@@ -1093,7 +1100,7 @@ fn test_custom_ignore_patterns() {
 
     let ignore = vec!["*.ts".to_string()];
     let stats = indexer
-        .index(path_str, &storage, &ignore)
+        .index(path_str, &storage, &ignore, u64::MAX)
         .expect("Indexing failed");
 
     // All .ts files should be ignored, only .min.js remains (which is also skipped by default)
@@ -1113,6 +1120,7 @@ fn test_update_files_skips_ignored() {
             &["vendor.min.js".to_string(), "simple.ts".to_string()],
             &storage,
             &["*.min.js".to_string()],
+            u64::MAX,
         )
         .expect("update_files failed");
 
