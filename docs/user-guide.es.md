@@ -9,7 +9,7 @@
 
 ### Instalación rápida
 
-```bash
+```text
 curl -sSf https://sh.ctxhelpr.dev | sh
 ```
 
@@ -17,7 +17,7 @@ Detecta tu plataforma, descarga la última versión, verifica el checksum e inst
 
 Opciones:
 
-```bash
+```text
 curl -sSf https://sh.ctxhelpr.dev | sh -s -- --version 1.1.0    # Versión específica
 curl -sSf https://sh.ctxhelpr.dev | sh -s -- --install-dir DIR   # Directorio personalizado
 curl -sSf https://sh.ctxhelpr.dev | sh -s -- --skip-setup        # Solo descargar, sin configuración
@@ -37,7 +37,7 @@ Descargá la última versión para tu plataforma desde la [página de releases](
 
 **Linux / macOS:**
 
-```bash
+```text
 tar xzf ctxhelpr-*.tar.gz
 mv ctxhelpr ~/.local/bin/
 ```
@@ -55,7 +55,7 @@ Extraé el archivo `.zip` y colocá `ctxhelpr.exe` en un directorio que esté en
 
 ### Integración con Claude Code
 
-```bash
+```text
 ctxhelpr install [-l | -g]
 ```
 
@@ -63,7 +63,7 @@ Registra el servidor MCP, instala el archivo de skill y el comando `/index`, ofr
 
 ### Gestión de permisos
 
-```bash
+```text
 ctxhelpr perms [-l | -g] [-a | -r]
 ```
 
@@ -71,7 +71,7 @@ Gestiona qué herramientas de ctxhelpr puede llamar Claude Code sin preguntar. S
 
 ### Desinstalar
 
-```bash
+```text
 ctxhelpr uninstall [-l | -g]
 ```
 
@@ -79,19 +79,19 @@ Elimina todas las integraciones y revoca permisos de herramientas. Ofrece elimin
 
 ## Referencia de Herramientas MCP
 
-| Herramienta         | Qué hace                                                                   |
-| ------------------- | -------------------------------------------------------------------------- |
-| `index_repository`  | Indexación completa/re-indexación con verificación incremental de hash     |
-| `update_files`      | Re-indexación rápida de archivos específicos después de ediciones (~50ms)  |
-| `get_overview`      | Estructura general del repo: lenguajes, módulos, tipos principales         |
-| `get_file_symbols`  | Todos los símbolos de un archivo con firmas y rangos de líneas             |
-| `get_symbol_detail` | Detalle completo: firma, docs, llamadas, invocadores, refs de tipos        |
-| `search_symbols`    | Búsqueda full-text en nombres de símbolos y documentación                  |
-| `get_references`    | Quién referencia un símbolo dado                                           |
-| `get_dependencies`  | De qué depende un símbolo                                                  |
-| `index_status`      | Verificar frescura del índice y detectar archivos desactualizados          |
-| `list_repos`        | Listar todos los repositorios indexados con estadísticas                   |
-| `delete_repos`      | Eliminar datos de índice de los repositorios especificados                 |
+| Herramienta         | Qué hace                                                                  |
+| ------------------- | ------------------------------------------------------------------------- |
+| `index_repository`  | Indexación completa/re-indexación con verificación incremental de hash    |
+| `update_files`      | Re-indexación rápida de archivos específicos después de ediciones (~50ms) |
+| `get_overview`      | Estructura general del repo: lenguajes, módulos, tipos principales        |
+| `get_file_symbols`  | Todos los símbolos de un archivo con firmas y rangos de líneas            |
+| `get_symbol_detail` | Detalle completo: firma, docs, llamadas, invocadores, refs de tipos       |
+| `search_symbols`    | Búsqueda full-text en nombres de símbolos y documentación                 |
+| `get_references`    | Quién referencia un símbolo dado                                          |
+| `get_dependencies`  | De qué depende un símbolo                                                 |
+| `index_status`      | Verificar frescura del índice y detectar archivos desactualizados         |
+| `list_repos`        | Listar todos los repositorios indexados con estadísticas                  |
+| `delete_repos`      | Eliminar datos de índice de los repositorios especificados                |
 
 ## Soporte de Lenguajes
 
@@ -126,7 +126,7 @@ Colocá un archivo `.ctxhelpr.json` en la raíz de tu repositorio para personali
 
 ### CLI de configuración
 
-```bash
+```text
 ctxhelpr config init                  # Crear un template .ctxhelpr.json en el directorio actual
 ctxhelpr config validate [--path dir] # Validar .ctxhelpr.json (sintaxis y esquema)
 ctxhelpr config show [--path dir]     # Mostrar configuración resuelta (defaults + overrides)
@@ -134,14 +134,14 @@ ctxhelpr config show [--path dir]     # Mostrar configuración resuelta (default
 
 ### Referencia de campos
 
-| Campo | Tipo | Default | Descripción |
-|-------|------|---------|-------------|
-| `output.max_tokens` | number o null | `null` | Limitar tamaño de respuesta (aproximado, 1 token ~ 4 bytes) |
-| `output.truncate_signatures` | number | `120` | Largo máximo de firma antes de truncar |
-| `output.truncate_doc_comments` | number | `100` | Largo máximo de doc comment en vistas resumidas |
-| `search.max_results` | number | `20` | Máximo de resultados de búsqueda |
-| `indexer.ignore` | string[] | `[]` | Patrones glob adicionales de rutas a ignorar |
-| `indexer.max_file_size` | number | `1048576` | Omitir archivos más grandes que esto (bytes) |
+| Campo                          | Tipo          | Default   | Descripción                                                 |
+| ------------------------------ | ------------- | --------- | ----------------------------------------------------------- |
+| `output.max_tokens`            | number o null | `null`    | Limitar tamaño de respuesta (aproximado, 1 token ~ 4 bytes) |
+| `output.truncate_signatures`   | number        | `120`     | Largo máximo de firma antes de truncar                      |
+| `output.truncate_doc_comments` | number        | `100`     | Largo máximo de doc comment en vistas resumidas             |
+| `search.max_results`           | number        | `20`      | Máximo de resultados de búsqueda                            |
+| `indexer.ignore`               | string[]      | `[]`      | Patrones glob adicionales de rutas a ignorar                |
+| `indexer.max_file_size`        | number        | `1048576` | Omitir archivos más grandes que esto (bytes)                |
 
 ### Variables de entorno
 
@@ -172,7 +172,7 @@ Todo esto pasa automáticamente vía el archivo de skill — no se necesita conf
 
 ## Referencia del CLI
 
-```bash
+```text
 ctxhelpr                                    # Mostrar ayuda
 ctxhelpr serve                              # Servidor MCP (usado internamente por Claude Code)
 ctxhelpr install [-l | -g]                  # Instalar integración

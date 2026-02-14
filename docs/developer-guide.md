@@ -9,13 +9,13 @@
 
 Requires Rust 1.85+ (edition 2024). If you're on an older version:
 
-```bash
+```text
 rustup update stable
 ```
 
 ## Build from Source
 
-```bash
+```text
 cargo build --release
 ```
 
@@ -25,7 +25,7 @@ Uses bundled SQLite via rusqlite - no external dependencies needed.
 
 ### Commands
 
-```bash
+```text
 cargo build --release                        # Build
 cargo test                                   # Run all tests (unit + integration)
 cargo test test_name                         # Run a single test
@@ -113,6 +113,7 @@ The `lib.rs` re-exports `indexer`, `output`, and `storage` for use in integratio
 All documentation files have English (`.md`) and Spanish (`.es.md`) versions. When updating any documentation file, update both language versions with the same structural and content changes. English is the source of truth.
 
 Documentation structure:
+
 - `README.md` / `README.es.md` - Project overview and quick start
 - `docs/user-guide.md` / `docs/user-guide.es.md` - Configuration, tools reference, CLI details
 - `docs/developer-guide.md` / `docs/developer-guide.es.md` - Building, architecture, contributing

@@ -9,7 +9,7 @@
 
 ### Quick install
 
-```bash
+```text
 curl -sSf https://sh.ctxhelpr.dev | sh
 ```
 
@@ -17,7 +17,7 @@ Detects your platform, downloads the latest release, verifies the checksum, and 
 
 Options:
 
-```bash
+```text
 curl -sSf https://sh.ctxhelpr.dev | sh -s -- --version 1.1.0    # Specific version
 curl -sSf https://sh.ctxhelpr.dev | sh -s -- --install-dir DIR   # Custom directory
 curl -sSf https://sh.ctxhelpr.dev | sh -s -- --skip-setup        # Download only, no setup
@@ -37,7 +37,7 @@ Download the latest release for your platform from the [releases page](https://g
 
 **Linux / macOS:**
 
-```bash
+```text
 tar xzf ctxhelpr-*.tar.gz
 mv ctxhelpr ~/.local/bin/
 ```
@@ -55,7 +55,7 @@ Extract the `.zip` file and place `ctxhelpr.exe` in a directory that is in your 
 
 ### Claude Code integration
 
-```bash
+```text
 ctxhelpr install [-l | -g]
 ```
 
@@ -63,7 +63,7 @@ Registers the MCP server, installs the skill file and `/index` command, prompts 
 
 ### Permissions management
 
-```bash
+```text
 ctxhelpr perms [-l | -g] [-a | -r]
 ```
 
@@ -71,7 +71,7 @@ Manages which ctxhelpr tools Claude Code can call without prompting. Without fla
 
 ### Uninstall
 
-```bash
+```text
 ctxhelpr uninstall [-l | -g]
 ```
 
@@ -126,7 +126,7 @@ Place a `.ctxhelpr.json` file in your repository root to customize behavior per-
 
 ### Configuration CLI
 
-```bash
+```text
 ctxhelpr config init                  # Create a .ctxhelpr.json template in the current directory
 ctxhelpr config validate [--path dir] # Validate .ctxhelpr.json (check syntax and schema)
 ctxhelpr config show [--path dir]     # Show resolved config (defaults merged with overrides)
@@ -134,14 +134,14 @@ ctxhelpr config show [--path dir]     # Show resolved config (defaults merged wi
 
 ### Field reference
 
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `output.max_tokens` | number or null | `null` | Limit response size (approximate, 1 token ~ 4 bytes) |
-| `output.truncate_signatures` | number | `120` | Max signature length before truncation |
-| `output.truncate_doc_comments` | number | `100` | Max doc comment length in brief views |
-| `search.max_results` | number | `20` | Max search results returned |
-| `indexer.ignore` | string[] | `[]` | Additional glob patterns of paths to ignore |
-| `indexer.max_file_size` | number | `1048576` | Skip files larger than this (bytes) |
+| Field                          | Type           | Default   | Description                                          |
+| ------------------------------ | -------------- | --------- | ---------------------------------------------------- |
+| `output.max_tokens`            | number or null | `null`    | Limit response size (approximate, 1 token ~ 4 bytes) |
+| `output.truncate_signatures`   | number         | `120`     | Max signature length before truncation               |
+| `output.truncate_doc_comments` | number         | `100`     | Max doc comment length in brief views                |
+| `search.max_results`           | number         | `20`      | Max search results returned                          |
+| `indexer.ignore`               | string[]       | `[]`      | Additional glob patterns of paths to ignore          |
+| `indexer.max_file_size`        | number         | `1048576` | Skip files larger than this (bytes)                  |
 
 ### Environment variables
 
@@ -172,7 +172,7 @@ This all happens automatically via the skill file — no additional setup needed
 
 ## CLI Reference
 
-```bash
+```text
 ctxhelpr                                    # Show help
 ctxhelpr serve                              # MCP server (used internally by Claude Code)
 ctxhelpr install [-l | -g]                  # Install integration

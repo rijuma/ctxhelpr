@@ -16,13 +16,13 @@ The result: faster context building, fewer tokens burned, and Claude actually _u
 
 ## Getting started
 
-```bash
+```text
 curl -sSf https://sh.ctxhelpr.dev | sh
 ```
 
 Then install it to Claude Code:
 
-```bash
+```text
 ctxhelpr install
 ```
 

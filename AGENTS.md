@@ -19,7 +19,7 @@ If successful, this project will extend to other coding agents.
 
 ## Commands
 
-```bash
+```text
 cargo build --release          # Build (uses bundled SQLite via rusqlite)
 cargo test                     # Run all tests (unit + integration)
 cargo test test_name           # Run a single test
@@ -74,6 +74,7 @@ When updating any documentation file, update both language versions with the
 same structural and content changes. English is the source of truth.
 
 Documentation structure:
+
 - `README.md` / `README.es.md` — Project overview and quick start
 - `docs/user-guide.md` / `docs/user-guide.es.md` — Configuration, tools reference, CLI details
 - `docs/developer-guide.md` / `docs/developer-guide.es.md` — Building, architecture, contributing

@@ -16,13 +16,13 @@ El resultado: construcción de contexto más rápida, menos tokens gastados, y C
 
 ## Primeros pasos
 
-```bash
+```text
 curl -sSf https://sh.ctxhelpr.dev | sh
 ```
 
 Después instalalo en Claude Code:
 
-```bash
+```text
 ctxhelpr install
 ```
 

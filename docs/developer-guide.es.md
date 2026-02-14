@@ -9,13 +9,13 @@
 
 Requiere Rust 1.85+ (edition 2024). Si tenés una versión anterior:
 
-```bash
+```text
 rustup update stable
 ```
 
 ## Compilar desde el Código Fuente
 
-```bash
+```text
 cargo build --release
 ```
 
@@ -25,7 +25,7 @@ Usa SQLite integrado vía rusqlite - no se necesitan dependencias externas.
 
 ### Comandos
 
-```bash
+```text
 cargo build --release                        # Compilar
 cargo test                                   # Ejecutar todos los tests (unit + integración)
 cargo test test_name                         # Ejecutar un test individual
@@ -113,6 +113,7 @@ src/
 Todos los archivos de documentación tienen versiones en inglés (`.md`) y español (`.es.md`). Al actualizar cualquier archivo de documentación, actualizá ambas versiones con los mismos cambios estructurales y de contenido. El inglés es la fuente de verdad.
 
 Estructura de documentación:
+
 - `README.md` / `README.es.md` - Visión general del proyecto e inicio rápido
 - `docs/user-guide.md` / `docs/user-guide.es.md` - Configuración, referencia de herramientas, detalles del CLI
 - `docs/developer-guide.md` / `docs/developer-guide.es.md` - Compilación, arquitectura, contribución
