@@ -10,7 +10,7 @@
 ### Quick install
 
 ```text
-curl -sSf https://sh.ctxhelpr.dev | sh
+curl -sSfL https://sh.ctxhelpr.dev | sh
 ```
 
 Detects your platform, downloads the latest release, verifies the checksum, and installs to `~/.local/bin/`.
@@ -18,9 +18,9 @@ Detects your platform, downloads the latest release, verifies the checksum, and 
 Options:
 
 ```text
-curl -sSf https://sh.ctxhelpr.dev | sh -s -- --version 1.1.0    # Specific version
-curl -sSf https://sh.ctxhelpr.dev | sh -s -- --install-dir DIR   # Custom directory
-curl -sSf https://sh.ctxhelpr.dev | sh -s -- --skip-setup        # Download only, no setup
+curl -sSfL https://sh.ctxhelpr.dev | sh -s -- --version 1.1.0    # Specific version
+curl -sSfL https://sh.ctxhelpr.dev | sh -s -- --install-dir DIR   # Custom directory
+curl -sSfL https://sh.ctxhelpr.dev | sh -s -- --skip-setup        # Download only, no setup
 ```
 
 ### Manual install

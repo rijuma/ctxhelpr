@@ -17,7 +17,7 @@ The result: faster context building, fewer tokens burned, and Claude actually _u
 ## Getting started
 
 ```text
-curl -sSf https://sh.ctxhelpr.dev | sh
+curl -sSfL https://sh.ctxhelpr.dev | sh
 ```
 
 Then install it to Claude Code:

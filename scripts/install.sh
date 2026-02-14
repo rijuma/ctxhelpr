@@ -1,6 +1,6 @@
 #!/bin/sh
 # ctxhelpr installer — https://sh.ctxhelpr.dev
-# Usage: curl -sSf https://sh.ctxhelpr.dev | sh
+# Usage: curl -sSfL https://sh.ctxhelpr.dev | sh
 #
 # Options:
 #   --version VERSION    Install a specific version (default: latest)
@@ -67,8 +67,8 @@ usage() {
 ctxhelpr installer
 
 Usage:
-    curl -sSf https://sh.ctxhelpr.dev | sh
-    curl -sSf https://sh.ctxhelpr.dev | sh -s -- [OPTIONS]
+    curl -sSfL https://sh.ctxhelpr.dev | sh
+    curl -sSfL https://sh.ctxhelpr.dev | sh -s -- [OPTIONS]
 
 Options:
     --version VERSION    Install a specific version (default: latest)
