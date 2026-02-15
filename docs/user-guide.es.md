@@ -56,10 +56,10 @@ Extraé el archivo `.zip` y colocá `ctxhelpr.exe` en un directorio que esté en
 ### Integración con Claude Code
 
 ```text
-ctxhelpr enable [-l | -g]
+ctxhelpr enable [-g | -l]
 ```
 
-Registra el servidor MCP, instala el archivo de skill y el comando `/reindex`, ofrece otorgar permisos a las herramientas, y muestra la ruta de la base de datos. Usá `-l` / `--local` para el directorio `.claude/` del proyecto, o `-g` / `--global` para `~/.claude/`. Si no se especifica ninguno, se te preguntará cuál elegir.
+Registra el servidor MCP, instala el archivo de skill y el comando `/reindex`, ofrece otorgar permisos a las herramientas, y muestra la ruta de la base de datos. Usá `-g` / `--global` para `~/.claude/`, o `-l` / `--local` para el directorio `.claude/` del proyecto. Si no se especifica ninguno, se te preguntará cuál elegir.
 
 ### Gestión de permisos
 
@@ -175,7 +175,7 @@ La búsqueda entiende las convenciones de nombres de código. Buscar `"user"` en
 
 ## Cómo lo Usa Claude
 
-Una vez configurado, el flujo es transparente:
+Una vez configurado, el flujo esperado es:
 
 1. Claude detecta que estás trabajando en código
 2. Verifica si el repo está indexado (`index_status`)
@@ -184,14 +184,14 @@ Una vez configurado, el flujo es transparente:
 5. Sigue cadenas de llamadas y dependencias (`get_references`, `get_dependencies`)
 6. Después de que editás archivos, mantiene el índice actualizado (`update_files`)
 
-Todo esto pasa automáticamente vía el archivo de skill — no se necesita configuración adicional.
+Esto lo gestiona el archivo de skill — no se necesita configuración adicional.
 
 ## Referencia del CLI
 
 ```text
 ctxhelpr                                    # Mostrar ayuda
 ctxhelpr serve                              # Servidor MCP (usado internamente por Claude Code)
-ctxhelpr enable [-l | -g]                   # Habilitar integración
+ctxhelpr enable [-g | -l]                   # Habilitar integración
 ctxhelpr disable [-l | -g]                  # Deshabilitar integración
 ctxhelpr perms [-l | -g] [-a | -r]          # Gestionar permisos
 ctxhelpr config init                        # Crear template .ctxhelpr.json

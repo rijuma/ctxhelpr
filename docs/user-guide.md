@@ -56,10 +56,10 @@ Extract the `.zip` file and place `ctxhelpr.exe` in a directory that is in your 
 ### Claude Code integration
 
 ```text
-ctxhelpr enable [-l | -g]
+ctxhelpr enable [-g | -l]
 ```
 
-Registers the MCP server, installs the skill file and `/reindex` command, prompts to grant tool permissions, and prints the database path. Use `-l` / `--local` for the project's `.claude/` directory, or `-g` / `--global` for `~/.claude/`. If neither is specified, you'll be prompted to choose.
+Registers the MCP server, installs the skill file and `/reindex` command, prompts to grant tool permissions, and prints the database path. Use `-g` / `--global` for `~/.claude/`, or `-l` / `--local` for the project's `.claude/` directory. If neither is specified, you'll be prompted to choose.
 
 ### Permissions management
 
@@ -175,7 +175,7 @@ Search understands code naming conventions. Searching for `"user"` finds `getUse
 
 ## How Claude Uses It
 
-Once set up, the workflow is transparent:
+Once set up, the intended workflow is:
 
 1. Claude detects you're working on code
 2. Checks if the repo is indexed (`index_status`)
@@ -184,14 +184,14 @@ Once set up, the workflow is transparent:
 5. Follows call chains and dependencies (`get_references`, `get_dependencies`)
 6. After you edit files, keeps the index fresh (`update_files`)
 
-This all happens automatically via the skill file — no additional setup needed.
+This is handled by the skill file — no additional setup needed.
 
 ## CLI Reference
 
 ```text
 ctxhelpr                                    # Show help
 ctxhelpr serve                              # MCP server (used internally by Claude Code)
-ctxhelpr enable [-l | -g]                   # Enable integration
+ctxhelpr enable [-g | -l]                   # Enable integration
 ctxhelpr disable [-l | -g]                  # Disable integration
 ctxhelpr perms [-l | -g] [-a | -r]          # Manage permissions
 ctxhelpr config init                        # Create .ctxhelpr.json template

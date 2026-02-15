@@ -9,7 +9,7 @@ This document explains how ctxhelpr indexes codebases, the design decisions behi
 
 ctxhelpr uses **tree-sitter** to parse source files into concrete syntax trees (CSTs), then extracts structural symbols (functions, classes, interfaces, etc.) and their relationships (calls, imports, type references). These are stored in **SQLite** with **FTS5** full-text search and served to AI agents via MCP tools.
 
-The key insight: AI agents don't need to read raw source files to navigate code. They need structured, token-efficient summaries they can drill into on demand.
+The design premise: AI agents don't need to read raw source files to navigate code — structured, token-efficient summaries they can drill into on demand should be sufficient.
 
 ## Data Flow
 
@@ -220,7 +220,7 @@ This means FTS is always consistent with the symbols table without manual rebuil
 ## Advantages
 
 1. **Fast incremental updates** - Only changed files are re-parsed. Hash-based change detection is reliable and fast.
-2. **Token-efficient output** - Compact keys, path deduplication, and truncation reduce AI context consumption by 30-60% compared to raw output.
+2. **Token-efficient output** - Compact keys, path deduplication, and truncation can reduce AI context consumption by an estimated 30-60% compared to raw output.
 3. **Code-aware search** - Pre-tokenized identifiers make substring searches work across naming conventions.
 4. **Language-agnostic core** - Adding a new language requires only implementing `LanguageExtractor`. Storage, output, and search work unchanged.
 5. **No external dependencies** - SQLite is bundled (via `rusqlite`), tree-sitter grammars are compiled in. Single binary with no runtime dependencies.

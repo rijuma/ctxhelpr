@@ -9,7 +9,7 @@
 
 Un servidor [MCP](https://modelcontextprotocol.io) que pre-indexa tu repositorio usando [tree-sitter](https://tree-sitter.github.io/) - funciones, clases, tipos, referencias, cadenas de llamadas - y guarda todo en una base de datos SQLite local. Claude Code navega tu código a través de herramientas específicas en lugar de leer miles de líneas de código crudo.
 
-El resultado: construcción de contexto más rápida, menos tokens gastados, y Claude _entiende_ la estructura de tu código antes de tocarlo.
+El objetivo: construcción de contexto más rápida, menor uso de tokens, y mejor conocimiento estructural antes de que Claude modifique tu código.
 
 > [!WARNING]
 > Este proyecto es **experimental** y está en desarrollo activo. No hay garantía de que el contexto indexado sea más efectivo que el que un agente de código construye por su cuenta. Usalo bajo tu propio riesgo.
@@ -55,6 +55,10 @@ ctxhelpr se ejecuta completamente en tu máquina. Tu código nunca sale de tu en
 - [Changelog](CHANGELOG.md)
 
 Toda la documentación está disponible en [inglés](README.md) también.
+
+## Benchmarks
+
+ctxhelpr es experimental y necesitamos datos reales para entender donde ayuda y donde se queda corto. Si estas dispuesto, ejecuta las [instrucciones de benchmark](docs/benchmark-instructions.es.md) en tus repositorios usando Claude Code y envia el `ctxhelpr-benchmark.md` resultante a [marcos@rigoli.dev](mailto:marcos@rigoli.dev) — nos ayuda a enfocarnos en lo que importa.
 
 ## Licencia
 
