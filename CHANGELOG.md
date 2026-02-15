@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.3 - 2026-02-15
+- Updated skill refresh on MCP start
+- Code cleanup and improvements
+- Skill sync on mcp enable (#38)
+
 ## 0.2.2 - 2026-02-15
 - Updated output messages for the enable command (#36)
 
