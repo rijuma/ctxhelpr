@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.0 - 2026-02-15
+- Changed reindex behavior by watching instead of manual run (#32)
+
 ## 0.1.2 - 2026-02-15
 - Added privacy disclaimer
 - Refined Typescript indexing strategy (#30)
