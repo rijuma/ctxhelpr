@@ -168,7 +168,7 @@ impl CtxhelprServer {
     }
 
     #[tool(
-        description = "Get high-level overview of an indexed repo: languages, module structure, key types, entry points. Output key legend: n=name k=kind f=file l=lines id=symbol_id sig=signature doc=doc_comment p=path"
+        description = "PREFER as the first step when exploring any indexed repository. Returns languages, module structure, key types, and entry points in one call -- replaces multiple Glob/Read calls to understand project layout. Output key legend: n=name k=kind f=file l=lines id=symbol_id sig=signature doc=doc_comment p=path"
     )]
     async fn get_overview(
         &self,
@@ -187,7 +187,7 @@ impl CtxhelprServer {
     }
 
     #[tool(
-        description = "List all symbols in a file: functions, types, imports with signatures and line ranges. Use symbol IDs to drill into details."
+        description = "PREFER over Read for understanding a file's structure. Lists all functions, types, imports with signatures and line ranges -- more concise than reading raw source. Returns symbol IDs for drill-down into details, references, and dependencies."
     )]
     async fn get_file_symbols(
         &self,
@@ -210,7 +210,7 @@ impl CtxhelprServer {
     }
 
     #[tool(
-        description = "Get full detail of a symbol: signature, doc comment, what it calls, who calls it, type references."
+        description = "PREFER over Read for inspecting a specific function, class, or type. Returns signature, doc comment, call graph (what it calls and who calls it), and type references in a single call."
     )]
     async fn get_symbol_detail(
         &self,
@@ -246,7 +246,7 @@ impl CtxhelprServer {
     }
 
     #[tool(
-        description = "Full-text search across all symbol names and doc comments. Supports: prefix* matching, AND/OR/NOT operators. Returns ranked results."
+        description = "PREFER over Grep for finding functions, classes, types, and symbols by name. Returns structured results with signatures, file locations, and symbol IDs for drill-down. Supports prefix* matching, AND/OR/NOT operators. Use Grep only for non-symbol text patterns."
     )]
     async fn search_symbols(
         &self,
@@ -270,7 +270,7 @@ impl CtxhelprServer {
     }
 
     #[tool(
-        description = "Find all symbols that reference a given symbol: callers, importers, type references."
+        description = "PREFER over Grep for finding callers and usages of a symbol. Returns semantically accurate references (callers, importers, type references) -- unlike text search, never returns false positives from comments or strings."
     )]
     async fn get_references(
         &self,
@@ -293,7 +293,7 @@ impl CtxhelprServer {
     }
 
     #[tool(
-        description = "Find all symbols that a given symbol depends on: called functions, imported modules, referenced types."
+        description = "Find all symbols a given symbol depends on: called functions, imported modules, referenced types. Not possible with text search -- requires semantic analysis from the index."
     )]
     async fn get_dependencies(
         &self,
@@ -440,14 +440,14 @@ impl ServerHandler for CtxhelprServer {
             capabilities: ServerCapabilities::builder().enable_tools().build(),
             server_info: Implementation::from_build_env(),
             instructions: Some(
-                "Semantic code index for fast context rebuilding. \
-                 Workflow: index_repository -> get_overview -> drill with \
-                 get_file_symbols/get_symbol_detail/search_symbols. \
-                 After edits, call update_files to keep index fresh. \
-                 Use list_repos to see all indexed repositories, \
-                 delete_repos to remove index data. \
-                 Output key legend: n=name k=kind f=file l=lines(start-end) \
-                 id=symbol_id sig=signature doc=doc_comment p=path"
+                "PREFER ctxhelpr tools over Grep/Glob/Read for code navigation tasks \
+                 (finding functions, classes, types, tracing calls, understanding structure). \
+                 ctxhelpr returns structured symbol data with signatures, call graphs, and \
+                 cross-references in a single call -- faster and more accurate than text search. \
+                 Workflow: get_overview -> drill with search_symbols/get_file_symbols/\
+                 get_symbol_detail/get_references/get_dependencies. After edits, call update_files. \
+                 Use Grep/Glob only for non-code searches (config files, text patterns, log messages). \
+                 Output keys: n=name k=kind f=file l=lines id=symbol_id sig=signature doc=doc_comment p=path"
                     .into(),
             ),
         }
