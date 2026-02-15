@@ -35,6 +35,10 @@ Run `ctxhelpr --help` for all CLI commands.
 - **Token-efficient output** - compact keys, path deduplication, configurable budgets
 - **11 MCP tools** for structural navigation
 
+## Privacy
+
+ctxhelpr runs entirely on your machine. Your code never leaves your local environment - all indexing, storage, and querying happens locally. The only external network access occurs when you explicitly run `ctxhelpr update` to check for new releases.
+
 ## Language support
 
 - TypeScript / TSX / JavaScript / JSX
