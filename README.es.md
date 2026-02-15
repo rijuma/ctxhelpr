@@ -33,7 +33,7 @@ Ejecutá `ctxhelpr --help` para todos los comandos del CLI.
 - **Indexación incremental** - hashing SHA256 de contenido, solo se re-parsean archivos modificados
 - **Búsqueda inteligente de código** - buscar "user" encuentra `getUserById`, `UserRepository`, `user_service`
 - **Salida eficiente en tokens** - claves compactas, deduplicación de rutas, presupuestos configurables
-- **11 herramientas MCP** para navegación estructural
+- **10 herramientas MCP** para navegación estructural
 
 ## Privacidad
 

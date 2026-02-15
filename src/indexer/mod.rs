@@ -420,7 +420,8 @@ fn process_file(
         }
     }
 
-    if let Err(err) = parser.set_language(&extractor.language()) {
+    let ext = full_path.extension().and_then(|e| e.to_str()).unwrap_or("");
+    if let Err(err) = parser.set_language(&extractor.language_for_ext(ext)) {
         tracing::warn!(file = %rel_path, error = %err, "Failed to set parser language");
         return Ok(FileResult::Skipped);
     }
@@ -435,7 +436,6 @@ fn process_file(
 
     let symbols = extractor.extract(&source, &tree);
 
-    let ext = full_path.extension().and_then(|e| e.to_str()).unwrap_or("");
     let language = languages::detect_language(ext).unwrap_or("unknown");
     let file_id = storage.upsert_file(repo_id, rel_path, &hash, language)?;
     storage.clear_file_symbols(file_id)?;

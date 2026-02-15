@@ -122,19 +122,21 @@ impl CtxhelprServer {
     ) -> Result<CallToolResult, McpError> {
         tracing::info!(path = %params.path, "index_repository");
         let config = self.config_cache.get(&params.path);
-        let storage = open_storage(&params.path)?;
-        let fmt = formatter(&config.output);
-        let stats = self
-            .indexer
-            .index(
-                &params.path,
-                &storage,
-                &config.indexer.ignore,
-                config.indexer.max_file_size,
-            )
-            .map_err(|e| McpError::internal_error(format!("Indexing failed: {e}"), None))?;
+        let indexer = self.indexer.clone();
+        let path = params.path.clone();
+        let ignore = config.indexer.ignore.clone();
+        let max_file_size = config.indexer.max_file_size;
+        let stats = tokio::task::spawn_blocking(move || {
+            let storage = open_storage(&path)?;
+            indexer
+                .index(&path, &storage, &ignore, max_file_size)
+                .map_err(|e| McpError::internal_error(format!("Indexing failed: {e}"), None))
+        })
+        .await
+        .map_err(|e| McpError::internal_error(format!("Indexing task failed: {e}"), None))??;
         crate::skills::refresh(&crate::skills::base_dirs_for_repo(&params.path));
         self.watcher.watch_repo(&params.path).await;
+        let fmt = formatter(&config.output);
         Ok(CallToolResult::success(vec![Content::text(
             fmt.format_index_result(&stats),
         )]))

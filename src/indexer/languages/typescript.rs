@@ -10,6 +10,13 @@ impl LanguageExtractor for TypeScriptExtractor {
         tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into()
     }
 
+    fn language_for_ext(&self, ext: &str) -> tree_sitter::Language {
+        match ext {
+            "tsx" | "jsx" => tree_sitter_typescript::LANGUAGE_TSX.into(),
+            _ => tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into(),
+        }
+    }
+
     fn extensions(&self) -> &[&str] {
         &["ts", "tsx", "js", "jsx", "mjs", "cjs"]
     }

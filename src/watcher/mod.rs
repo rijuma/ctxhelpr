@@ -42,22 +42,28 @@ pub struct WatcherHandle {
 impl WatcherHandle {
     /// Start watching a newly-indexed repo.
     pub async fn watch_repo(&self, path: &str) {
-        let _ = self
+        if let Err(e) = self
             .cmd_tx
             .send(WatcherCommand::Watch {
                 repo_path: path.to_string(),
             })
-            .await;
+            .await
+        {
+            tracing::warn!(path = %path, error = %e, "Failed to send watch command");
+        }
     }
 
     /// Stop watching a deleted repo.
     pub async fn unwatch_repo(&self, path: &str) {
-        let _ = self
+        if let Err(e) = self
             .cmd_tx
             .send(WatcherCommand::Unwatch {
                 repo_path: path.to_string(),
             })
-            .await;
+            .await
+        {
+            tracing::warn!(path = %path, error = %e, "Failed to send unwatch command");
+        }
     }
 
     /// Shut down the watcher event loop.

@@ -43,7 +43,7 @@ Salida JSON compacta vía herramientas MCP
 
 - **Primera indexación**: O(n) donde n = total de archivos. El parsing de tree-sitter es rápido (~1ms por archivo para la mayoría)
 - **Re-indexación (sin cambios)**: O(n) para el recorrido de directorios + O(m) para búsquedas de hash, donde m = archivos indexados. No se realiza parsing.
-- **Actualización parcial** (`update_files`): O(k) donde k = número de archivos especificados. Evita el recorrido de directorios por completo.
+- **Actualización parcial** (watcher en segundo plano): O(k) donde k = número de archivos modificados. Evita el recorrido de directorios por completo.
 - **Batching de transacciones**: Todas las inserciones ocurren dentro de un solo `BEGIN IMMEDIATE`...`COMMIT`, evitando overhead de transacción por fila
 
 ### Selección de Archivos

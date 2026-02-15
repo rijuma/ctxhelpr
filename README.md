@@ -33,7 +33,7 @@ Run `ctxhelpr --help` for all CLI commands.
 - **Incremental indexing** - SHA256 content hashing, only changed files are re-parsed
 - **Code-aware search** - searching "user" finds `getUserById`, `UserRepository`, `user_service`
 - **Token-efficient output** - compact keys, path deduplication, configurable budgets
-- **11 MCP tools** for structural navigation
+- **10 MCP tools** for structural navigation
 
 ## Privacy
 

@@ -8,6 +8,9 @@ use crate::indexer::ExtractedSymbol;
 
 pub trait LanguageExtractor: Send + Sync {
     fn language(&self) -> tree_sitter::Language;
+    fn language_for_ext(&self, _ext: &str) -> tree_sitter::Language {
+        self.language()
+    }
     fn extensions(&self) -> &[&str];
     fn extract(&self, source: &[u8], tree: &tree_sitter::Tree) -> Vec<ExtractedSymbol>;
 }

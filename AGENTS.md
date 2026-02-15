@@ -4,7 +4,7 @@ This file provides guidance to coding agents when working with code in this repo
 
 ## What This Is
 
-ctxhelpr is an MCP server that semantically indexes codebases using tree-sitter, stores symbols/references in SQLite with FTS5, and exposes 11 tools for Claude Code (Initially) to navigate code structurally instead of reading raw files. Written in Rust.
+ctxhelpr is an MCP server that semantically indexes codebases using tree-sitter, stores symbols/references in SQLite with FTS5, and exposes 10 tools for Claude Code (Initially) to navigate code structurally instead of reading raw files. Written in Rust.
 
 If successful, this project will extend to other coding agents.
 
@@ -63,7 +63,7 @@ After making code changes, always run these checks and fix any issues before con
 
 ## Testing
 
-Integration tests in `tests/integration.rs` use `SqliteStorage::open_memory()` and index fixture files under `tests/fixtures/typescript/`. Tests cover: indexing, incremental re-index, symbol extraction (functions, classes, interfaces, enums, arrow functions), doc comments, call references, search, and compact output format.
+Integration tests in `tests/integration.rs` use `SqliteStorage::open_memory()` and index fixture files under `tests/fixtures/`. Tests cover: indexing, incremental re-index, symbol extraction (functions, classes, interfaces, enums, arrow functions), doc comments, call references, search, and compact output format.
 
 ## Rust Edition
 
@@ -81,3 +81,5 @@ Documentation structure:
 - `docs/user-guide.md` / `docs/user-guide.es.md` — Configuration, tools reference, CLI details
 - `docs/developer-guide.md` / `docs/developer-guide.es.md` — Building, architecture, contributing
 - `docs/indexing-strategy.md` / `docs/indexing-strategy.es.md` — Indexing architecture deep dive
+- `docs/benchmark-instructions.md` / `docs/benchmark-instructions.es.md` — Benchmarking methodology
+- `docs/benchmark-prompt.md` — Standard benchmark prompt

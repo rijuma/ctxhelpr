@@ -52,8 +52,9 @@ pub fn run() -> Result<()> {
 
     // Extract
     print!("  Extracting... ");
+    let tarball_str = tarball_path.to_str().context("non-UTF-8 tarball path")?;
     let status = Command::new("tar")
-        .args(["xzf", tarball_path.to_str().unwrap(), "-C"])
+        .args(["xzf", tarball_str, "-C"])
         .arg(&tmpdir)
         .status()
         .context("failed to run tar")?;
@@ -105,26 +106,12 @@ fn fetch_latest_version() -> Result<String> {
     ))?;
     let response = String::from_utf8(output).context("invalid UTF-8 in API response")?;
 
-    // Parse tag_name from JSON (avoid adding serde_json dependency for this)
-    // Format: "tag_name": "v1.2.3"
-    let tag = response
-        .lines()
-        .find(|line| line.contains("\"tag_name\""))
-        .and_then(|line| {
-            let start = line.find('"').and_then(|i| {
-                line[i + 1..].find('"').and_then(|j| {
-                    line[i + 1 + j + 1..]
-                        .find('"')
-                        .map(|k| i + 1 + j + 1 + k + 1)
-                })
-            })?;
-            let end = line[start..].find('"').map(|i| i + start)?;
-            Some(line[start..end].to_string())
-        })
-        .context("could not parse tag_name from GitHub API response")?;
-
-    // Strip leading 'v' if present
-    Ok(tag.strip_prefix('v').unwrap_or(&tag).to_string())
+    let release: serde_json::Value =
+        serde_json::from_str(&response).context("could not parse GitHub API response")?;
+    let tag = release["tag_name"]
+        .as_str()
+        .context("missing tag_name in GitHub API response")?;
+    Ok(tag.strip_prefix('v').unwrap_or(tag).to_string())
 }
 
 fn http_get(url: &str) -> Result<Vec<u8>> {
