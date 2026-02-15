@@ -119,6 +119,7 @@ pub async fn start(indexer: Arc<Indexer>, config_cache: Arc<ConfigCache>) -> Wat
                     duration_ms = stats.duration_ms,
                     "Startup reindex complete"
                 );
+                crate::skills::refresh(&crate::skills::base_dirs_for_repo(repo_path));
             }
             Ok(Err(e)) => {
                 tracing::warn!(path = %repo_path, error = %e, "Startup reindex failed");

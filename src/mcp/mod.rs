@@ -6,7 +6,6 @@ use rmcp::serde;
 use rmcp::{ServerHandler, tool, tool_handler, tool_router};
 use schemars::JsonSchema;
 use serde::Deserialize;
-use std::path::Path;
 use std::sync::Arc;
 
 use crate::config::{ConfigCache, OutputConfig};
@@ -134,7 +133,7 @@ impl CtxhelprServer {
                 config.indexer.max_file_size,
             )
             .map_err(|e| McpError::internal_error(format!("Indexing failed: {e}"), None))?;
-        refresh_skill_files(&params.path);
+        crate::skills::refresh(&crate::skills::base_dirs_for_repo(&params.path));
         self.watcher.watch_repo(&params.path).await;
         Ok(CallToolResult::success(vec![Content::text(
             fmt.format_index_result(&stats),
@@ -373,50 +372,6 @@ impl CtxhelprServer {
         Ok(CallToolResult::success(vec![Content::text(
             result.to_string(),
         )]))
-    }
-}
-
-const SKILL_CONTENT: &str = include_str!("../assets/skill.md");
-const REINDEX_COMMAND_CONTENT: &str = include_str!("../assets/reindex_command.md");
-
-fn refresh_skill_files(repo_path: &str) {
-    let paths_to_check: Vec<std::path::PathBuf> = [
-        dirs::home_dir().map(|h| h.join(".claude")),
-        Some(Path::new(repo_path).join(".claude")),
-    ]
-    .into_iter()
-    .flatten()
-    .collect();
-
-    for base in &paths_to_check {
-        let skill_path = base.join("skills").join("ctxhelpr").join("SKILL.md");
-        if skill_path.exists() {
-            if let Err(e) = std::fs::write(&skill_path, SKILL_CONTENT) {
-                tracing::debug!(path = %skill_path.display(), error = %e, "failed to refresh skill file");
-            } else {
-                tracing::debug!(path = %skill_path.display(), "refreshed skill file");
-            }
-        }
-
-        // Install/refresh as reindex.md, clean up old index.md
-        let reindex_path = base.join("commands").join("reindex.md");
-        if reindex_path.exists() {
-            if let Err(e) = std::fs::write(&reindex_path, REINDEX_COMMAND_CONTENT) {
-                tracing::debug!(path = %reindex_path.display(), error = %e, "failed to refresh command file");
-            } else {
-                tracing::debug!(path = %reindex_path.display(), "refreshed command file");
-            }
-        }
-
-        // Clean up old /index command if present
-        let old_cmd_path = base.join("commands").join("index.md");
-        if old_cmd_path.exists() {
-            let _ = std::fs::remove_file(&old_cmd_path);
-            // Install reindex.md in its place
-            if !reindex_path.exists() {
-                let _ = std::fs::write(&reindex_path, REINDEX_COMMAND_CONTENT);
-            }
-        }
     }
 }
 

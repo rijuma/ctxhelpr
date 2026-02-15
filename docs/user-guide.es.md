@@ -83,7 +83,7 @@ Elimina todas las integraciones, revoca permisos de herramientas, elimina las ba
 ctxhelpr update
 ```
 
-Busca una versión más reciente en GitHub, descarga y verifica el release, y reemplaza el binario actual. También refresca los archivos de skill y comando si existen. Sugiere re-indexar los repositorios después de actualizar.
+Busca una versión más reciente en GitHub, descarga y verifica el release, y reemplaza el binario actual. Refresca los archivos de skill y comando para la instalación global y el proyecto actual. Los archivos de skill en otros proyectos habilitados localmente se refrescan automáticamente la próxima vez que el servidor MCP inicia.
 
 ### Desinstalar
 

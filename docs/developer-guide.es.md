@@ -60,9 +60,11 @@ Archivos en disco → parsing con tree-sitter → ExtractedSymbol/ExtractedRef �
 src/
 ├── main.rs                 # Punto de entrada del CLI
 ├── config.rs               # Configuración por proyecto (.ctxhelpr.json)
+├── skills.rs               # Constantes compartidas de skill/comando y lógica de refresh
 ├── cli/                    # Comandos enable, disable, perms, permissions y repos
 ├── server/                 # Servidor MCP (transporte stdio)
 ├── mcp/                    # Definiciones y handlers de herramientas
+├── watcher/                # Watcher de archivos en background y reindex al iniciar
 ├── indexer/                # Lógica de indexación + extractores por lenguaje
 │   └── languages/          # Extractores basados en tree-sitter (TS, Python, Rust, Ruby, MD)
 ├── storage/                # Persistencia SQLite + esquema + tokenizador de código
@@ -80,9 +82,11 @@ src/
 - **`storage/`** - `SqliteStorage` envuelve rusqlite. El esquema está en `schema.sql` (cargado vía `include_str!`). La DB es por repo, almacenada en `~/.cache/ctxhelpr/<hash>.db`. La tabla virtual FTS5 con triggers mantiene el índice full-text sincronizado. Provee `begin_transaction()`/`commit()` para batching - el indexer envuelve todas las operaciones en una sola transacción por rendimiento.
 - **`output/`** - `CompactFormatter` produce JSON eficiente en tokens con claves cortas (`n`, `k`, `f`, `l`, `sig`, `doc`, `id`).
 - **`cli/`** - `enable.rs` registra el servidor MCP, instala un archivo de skill y el comando `/reindex` en `~/.claude/`. `disable.rs` elimina el registro, el archivo de skill, el comando, las bases de datos de índice y la configuración del proyecto.
+- **`skills.rs`** - Constantes compartidas (`SKILL_CONTENT`, `REINDEX_COMMAND_CONTENT`) y función `refresh()` para actualizar los archivos de skill y comando instalados. Usado por `cli/update.rs`, `cli/enable.rs`, `mcp/` y `watcher/`.
+- **`watcher/`** - Watcher de archivos en background. Al iniciar el servidor, re-indexa todos los repos conocidos (bloqueante) y refresca sus archivos de skill, luego observa cambios en el filesystem vía `notify` y dispara re-indexación incremental a través de un debouncer.
 - **`assets/`** - Templates markdown embebidos para el skill y slash command (incluidos en tiempo de compilación).
 
-`lib.rs` re-exporta `indexer`, `output` y `storage` para uso en tests de integración.
+`lib.rs` re-exporta `config`, `indexer`, `output`, `storage`, `skills` y `watcher` para uso en tests de integración.
 
 ### Stack tecnológico
 

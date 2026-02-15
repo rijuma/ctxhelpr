@@ -6,8 +6,6 @@ use std::process::Command;
 use super::style;
 
 const REPO: &str = "rijuma/ctxhelpr";
-const SKILL_CONTENT: &str = include_str!("../assets/skill.md");
-const REINDEX_COMMAND_CONTENT: &str = include_str!("../assets/reindex_command.md");
 
 pub fn run() -> Result<()> {
     let current_version = env!("CARGO_PKG_VERSION");
@@ -24,7 +22,9 @@ pub fn run() -> Result<()> {
 
     if current_version == latest_version {
         println!("\n  {}", style::success("Already up to date!"));
-        refresh_skill_files();
+        if crate::skills::refresh(&crate::skills::base_dirs_for_cwd()) > 0 {
+            println!("  Refreshed skill and command files.");
+        }
         return Ok(());
     }
 
@@ -73,14 +73,13 @@ pub fn run() -> Result<()> {
     let _ = fs::remove_dir_all(&tmpdir);
 
     // Refresh skill files
-    refresh_skill_files();
+    if crate::skills::refresh(&crate::skills::base_dirs_for_cwd()) > 0 {
+        println!("  Refreshed skill and command files.");
+    }
 
     println!(
         "\n  {}",
         style::success(&format!("Updated to v{latest_version}!"))
-    );
-    println!(
-        "\n  Consider re-indexing your repositories to take advantage of any indexing improvements."
     );
 
     Ok(())
@@ -237,57 +236,4 @@ fn replace_binary(new_binary: &Path, current_exe: &Path) -> Result<()> {
     fs::rename(&tmp_dest, current_exe).context("failed to replace binary")?;
 
     Ok(())
-}
-
-fn refresh_skill_files() {
-    let paths_to_check: Vec<std::path::PathBuf> = [
-        dirs::home_dir().map(|h| h.join(".claude")),
-        std::env::current_dir().ok().map(|d| d.join(".claude")),
-    ]
-    .into_iter()
-    .flatten()
-    .collect();
-
-    let mut refreshed = false;
-    for base in &paths_to_check {
-        let skill_path = base.join("skills").join("ctxhelpr").join("SKILL.md");
-        if skill_path.exists() {
-            if let Err(e) = fs::write(&skill_path, SKILL_CONTENT) {
-                eprintln!(
-                    "  {}",
-                    style::warn(&format!("Warning: could not refresh skill file: {e}"))
-                );
-            } else {
-                refreshed = true;
-            }
-        }
-
-        // Refresh reindex.md command
-        let reindex_path = base.join("commands").join("reindex.md");
-        if reindex_path.exists() {
-            if let Err(e) = fs::write(&reindex_path, REINDEX_COMMAND_CONTENT) {
-                eprintln!(
-                    "  {}",
-                    style::warn(&format!("Warning: could not refresh command file: {e}"))
-                );
-            } else {
-                refreshed = true;
-            }
-        }
-
-        // Clean up old /index command if present
-        let old_cmd_path = base.join("commands").join("index.md");
-        if old_cmd_path.exists() {
-            let _ = fs::remove_file(&old_cmd_path);
-            // Install reindex.md in its place
-            if !reindex_path.exists() {
-                let _ = fs::write(&reindex_path, REINDEX_COMMAND_CONTENT);
-            }
-            refreshed = true;
-        }
-    }
-
-    if refreshed {
-        println!("  Refreshed skill and command files.");
-    }
 }

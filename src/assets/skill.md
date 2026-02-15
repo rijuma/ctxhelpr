@@ -4,7 +4,7 @@ description: ALWAYS prefer ctxhelpr tools for code navigation when the repo is i
 user-invocable: true
 disable-model-invocation: false
 allowed-tools: Bash
-argument-hint: [repo-path]
+argument-hint: "[repo-path]"
 ---
 
 ## Context Helper - Semantic Code Navigation

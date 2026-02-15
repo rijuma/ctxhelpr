@@ -41,9 +41,11 @@ Key modules:
 - **`storage/`** — `SqliteStorage` wraps rusqlite. Schema is in `schema.sql` (loaded via `include_str!`). DB is per-repo, stored at `~/.cache/ctxhelpr/<hash>.db`. FTS5 virtual table with triggers keeps full-text index in sync. Provides `begin_transaction()`/`commit()` for batching — the indexer wraps all operations in a single transaction for performance.
 - **`output/`** — `CompactFormatter` produces token-efficient JSON with short keys (`n`, `k`, `f`, `l`, `sig`, `doc`, `id`).
 - **`cli/`** — `enable.rs` registers the MCP server, installs a skill file and `/reindex` command into `~/.claude/`. `disable.rs` reverses this.
+- **`skills.rs`** — Shared constants (`SKILL_CONTENT`, `REINDEX_COMMAND_CONTENT`) and `refresh()` function for updating installed skill and command files. Used by `cli/update.rs`, `cli/enable.rs`, `mcp/`, and `watcher/`.
+- **`watcher/`** — Background file watcher. On server startup, reindexes all known repos (blocking) and refreshes their skill files, then watches for filesystem changes via `notify` and triggers incremental reindex through a debouncer.
 - **`assets/`** — Embedded markdown templates for the skill and slash command (included at compile time).
 
-The `lib.rs` re-exports `indexer`, `output`, and `storage` for use in integration tests.
+The `lib.rs` re-exports `config`, `indexer`, `output`, `storage`, `skills`, and `watcher` for use in integration tests.
 
 ## Adding a New Language Extractor
 

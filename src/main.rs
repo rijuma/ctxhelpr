@@ -7,6 +7,7 @@ mod indexer;
 mod mcp;
 mod output;
 mod server;
+mod skills;
 mod storage;
 mod watcher;
 

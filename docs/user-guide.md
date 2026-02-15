@@ -83,7 +83,7 @@ Removes all integrations, revokes tool permissions, deletes index databases (cur
 ctxhelpr update
 ```
 
-Checks for a newer version on GitHub, downloads and verifies the release, and replaces the current binary. Also refreshes skill and command files if they exist. Suggests reindexing repositories after updating.
+Checks for a newer version on GitHub, downloads and verifies the release, and replaces the current binary. Refreshes skill and command files for the global installation and the current project. Skill files in other locally-enabled projects are refreshed automatically the next time the MCP server starts.
 
 ### Uninstall
 
