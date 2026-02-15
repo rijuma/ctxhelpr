@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.1 - 2026-02-15
+- Fixed install script
+- Updated CF script
+- Updated descriptions to make Claude more likely to use the ctxhelpr without an explicit request from the user
+
 ## 0.1.0 - 2026-02-14
 - First commit
 - Add GitHub workflows
