@@ -3,9 +3,8 @@ use serde_json::Value;
 use std::fs;
 use std::path::Path;
 
-pub const TOOL_PERMISSIONS: [&str; 11] = [
+pub const TOOL_PERMISSIONS: [&str; 10] = [
     "mcp__ctxhelpr__index_repository",
-    "mcp__ctxhelpr__update_files",
     "mcp__ctxhelpr__get_overview",
     "mcp__ctxhelpr__get_file_symbols",
     "mcp__ctxhelpr__get_symbol_detail",
@@ -17,9 +16,8 @@ pub const TOOL_PERMISSIONS: [&str; 11] = [
     "mcp__ctxhelpr__delete_repos",
 ];
 
-pub const TOOL_LABELS: [&str; 11] = [
+pub const TOOL_LABELS: [&str; 10] = [
     "index_repository  - Full index/re-index",
-    "update_files      - Re-index specific files after edits",
     "get_overview      - High-level repo structure",
     "get_file_symbols  - All symbols in a file",
     "get_symbol_detail - Full symbol details",
@@ -73,11 +71,11 @@ pub fn set_grants(path: &Path, grants: &[bool]) -> Result<()> {
 }
 
 pub fn grant_all(path: &Path) -> Result<()> {
-    set_grants(path, &[true; 11])
+    set_grants(path, &[true; 10])
 }
 
 pub fn revoke_all(path: &Path) -> Result<()> {
-    set_grants(path, &[false; 11])
+    set_grants(path, &[false; 10])
 }
 
 fn apply_grants(settings: &mut Value, grants: &[bool]) -> Result<()> {
@@ -122,10 +120,10 @@ mod tests {
     #[test]
     fn grant_all_to_empty_settings() {
         let mut settings = json!({});
-        apply_grants(&mut settings, &[true; 11]).unwrap();
+        apply_grants(&mut settings, &[true; 10]).unwrap();
 
         let allow = settings["permissions"]["allow"].as_array().unwrap();
-        assert_eq!(allow.len(), 11);
+        assert_eq!(allow.len(), 10);
         for perm in &TOOL_PERMISSIONS {
             assert!(allow.contains(&json!(perm)));
         }
@@ -140,10 +138,10 @@ mod tests {
             },
             "other_key": true
         });
-        apply_grants(&mut settings, &[true; 11]).unwrap();
+        apply_grants(&mut settings, &[true; 10]).unwrap();
 
         let allow = settings["permissions"]["allow"].as_array().unwrap();
-        assert_eq!(allow.len(), 13); // 2 existing + 11 ctxhelpr
+        assert_eq!(allow.len(), 12); // 2 existing + 10 ctxhelpr
         assert!(allow.contains(&json!("mcp__other__tool")));
         assert!(allow.contains(&json!("some_permission")));
         assert_eq!(settings["permissions"]["deny"][0], "something");
@@ -162,7 +160,7 @@ mod tests {
                 ]
             }
         });
-        apply_grants(&mut settings, &[false; 11]).unwrap();
+        apply_grants(&mut settings, &[false; 10]).unwrap();
 
         let allow = settings["permissions"]["allow"].as_array().unwrap();
         assert_eq!(allow.len(), 2);
@@ -173,12 +171,12 @@ mod tests {
     #[test]
     fn selective_grants() {
         let mut settings = json!({});
-        let mut grants = [false; 11];
+        let mut grants = [false; 10];
         grants[0] = true; // index_repository
-        grants[2] = true; // get_overview
-        grants[5] = true; // search_symbols
-        grants[7] = true; // get_dependencies
-        grants[8] = true; // index_status
+        grants[1] = true; // get_overview
+        grants[4] = true; // search_symbols
+        grants[6] = true; // get_dependencies
+        grants[7] = true; // index_status
 
         apply_grants(&mut settings, &grants).unwrap();
 
@@ -194,17 +192,17 @@ mod tests {
     #[test]
     fn idempotent_grant_no_duplicates() {
         let mut settings = json!({});
-        apply_grants(&mut settings, &[true; 11]).unwrap();
-        apply_grants(&mut settings, &[true; 11]).unwrap();
+        apply_grants(&mut settings, &[true; 10]).unwrap();
+        apply_grants(&mut settings, &[true; 10]).unwrap();
 
         let allow = settings["permissions"]["allow"].as_array().unwrap();
-        assert_eq!(allow.len(), 11);
+        assert_eq!(allow.len(), 10);
     }
 
     #[test]
     fn apply_grants_rejects_non_object_settings() {
         let mut settings = json!("not an object");
-        let result = apply_grants(&mut settings, &[true; 11]);
+        let result = apply_grants(&mut settings, &[true; 10]);
         assert!(result.is_err());
         assert!(
             result
@@ -217,7 +215,7 @@ mod tests {
     #[test]
     fn apply_grants_rejects_non_object_permissions() {
         let mut settings = json!({"permissions": "not an object"});
-        let result = apply_grants(&mut settings, &[true; 11]);
+        let result = apply_grants(&mut settings, &[true; 10]);
         assert!(result.is_err());
         assert!(
             result
@@ -230,7 +228,7 @@ mod tests {
     #[test]
     fn apply_grants_rejects_non_array_allow() {
         let mut settings = json!({"permissions": {"allow": "not an array"}});
-        let result = apply_grants(&mut settings, &[true; 11]);
+        let result = apply_grants(&mut settings, &[true; 10]);
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("not a JSON array"));
     }
@@ -276,13 +274,13 @@ mod tests {
         });
         write_settings(&path, &initial).unwrap();
 
-        set_grants(&path, &[true; 11]).unwrap();
+        set_grants(&path, &[true; 10]).unwrap();
 
         let settings = read_settings(&path).unwrap();
         let allow = settings["permissions"]["allow"].as_array().unwrap();
         assert!(allow.contains(&json!("other_tool_permission")));
         assert_eq!(settings["permissions"]["deny"][0], "something_else");
         assert_eq!(settings["unrelated_key"], 42);
-        assert_eq!(allow.len(), 12); // 1 existing + 11 ctxhelpr
+        assert_eq!(allow.len(), 11); // 1 existing + 10 ctxhelpr
     }
 }

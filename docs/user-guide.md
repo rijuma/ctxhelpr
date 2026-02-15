@@ -83,7 +83,7 @@ Removes all integrations, revokes tool permissions, deletes index databases (cur
 ctxhelpr update
 ```
 
-Checks for a newer version on GitHub, downloads and verifies the release, and replaces the current binary. Also refreshes skill and command files if they exist. Suggests reindexing repositories after updating.
+Checks for a newer version on GitHub, downloads and verifies the release, and replaces the current binary. Refreshes skill and command files for the global installation and the current project. Skill files in other locally-enabled projects are refreshed automatically the next time the MCP server starts.
 
 ### Uninstall
 
@@ -98,7 +98,6 @@ Completely removes ctxhelpr from your system. Disables all integrations (global 
 | Tool                | What it does                                             |
 | ------------------- | -------------------------------------------------------- |
 | `index_repository`  | Full index/re-index with incremental hash-checking       |
-| `update_files`      | Fast re-index of specific files after edits (~50ms)      |
 | `get_overview`      | High-level repo structure: languages, modules, key types |
 | `get_file_symbols`  | All symbols in a file with signatures and line ranges    |
 | `get_symbol_detail` | Full details: signature, docs, calls, callers, type refs |
@@ -143,9 +142,9 @@ Place a `.ctxhelpr.json` file in your repository root to customize behavior per-
 ### Configuration CLI
 
 ```text
-ctxhelpr config init                  # Create a .ctxhelpr.json template in the current directory
-ctxhelpr config validate [--path dir] # Validate .ctxhelpr.json (check syntax and schema)
-ctxhelpr config show [--path dir]     # Show resolved config (defaults merged with overrides)
+ctxhelpr config init [--global]          # Create a .ctxhelpr.json template (local or global)
+ctxhelpr config validate [--global]      # Validate .ctxhelpr.json (local or global)
+ctxhelpr config show [--path dir]        # Show resolved config (defaults merged with overrides)
 ```
 
 ### Field reference
@@ -182,7 +181,7 @@ Once set up, the intended workflow is:
 3. Gets a structural overview (`get_overview`)
 4. Drills into specific areas as needed (`get_file_symbols`, `search_symbols`, `get_symbol_detail`)
 5. Follows call chains and dependencies (`get_references`, `get_dependencies`)
-6. After you edit files, keeps the index fresh (`update_files`)
+6. A background file watcher automatically keeps the index fresh as you edit
 
 This is handled by the skill file — no additional setup needed.
 
@@ -194,9 +193,9 @@ ctxhelpr serve                              # MCP server (used internally by Cla
 ctxhelpr enable [-g | -l]                   # Enable integration
 ctxhelpr disable [-l | -g]                  # Disable integration
 ctxhelpr perms [-l | -g] [-a | -r]          # Manage permissions
-ctxhelpr config init                        # Create .ctxhelpr.json template
-ctxhelpr config validate [--path dir]       # Validate config file
-ctxhelpr config show [--path dir]           # Show resolved config
+ctxhelpr config init [--global]                 # Create config template
+ctxhelpr config validate [--global | --path dir] # Validate config file
+ctxhelpr config show [--path dir]               # Show resolved config
 ctxhelpr repos list                         # List all indexed repositories
 ctxhelpr repos delete [paths...]            # Delete index data (interactive if no paths)
 ctxhelpr update                             # Update to the latest version

@@ -43,7 +43,7 @@ Compact JSON output via MCP tools
 
 - **First index**: O(n) where n = total files. Tree-sitter parsing is fast (~1ms per file for most files)
 - **Re-index (no changes)**: O(n) for the directory walk + O(m) for hash lookups, where m = indexed files. No parsing occurs.
-- **Partial update** (`update_files`): O(k) where k = number of specified files. Bypasses directory walk entirely.
+- **Partial update** (background watcher): O(k) where k = number of changed files. Bypasses directory walk entirely.
 - **Transaction batching**: All inserts happen within a single `BEGIN IMMEDIATE`...`COMMIT`, avoiding per-row transaction overhead
 
 ### File Selection

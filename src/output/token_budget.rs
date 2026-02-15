@@ -81,7 +81,7 @@ impl TokenBudget {
         }
         let suffix = r#","truncated":true}"#;
         let available = self.max_bytes - suffix.len() - 1; // -1 for safety
-        let boundary = Self::floor_char_boundary(text, available.min(text.len()));
+        let boundary = super::floor_char_boundary(text, available.min(text.len()));
         let truncated = &text[..boundary];
         // Try to find a valid JSON boundary
         if let Some(pos) = truncated.rfind('}') {
@@ -89,17 +89,6 @@ impl TokenBudget {
         } else {
             r#"{"truncated":true}"#.to_string()
         }
-    }
-
-    fn floor_char_boundary(s: &str, max_bytes: usize) -> usize {
-        if max_bytes >= s.len() {
-            return s.len();
-        }
-        let mut i = max_bytes;
-        while i > 0 && !s.is_char_boundary(i) {
-            i -= 1;
-        }
-        i
     }
 }
 

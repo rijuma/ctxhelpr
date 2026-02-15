@@ -391,7 +391,7 @@ impl PathIndex {
 // ── Signature normalization ──
 
 /// Find the largest byte index <= max_bytes that is a valid char boundary.
-fn floor_char_boundary(s: &str, max_bytes: usize) -> usize {
+pub(crate) fn floor_char_boundary(s: &str, max_bytes: usize) -> usize {
     if max_bytes >= s.len() {
         return s.len();
     }

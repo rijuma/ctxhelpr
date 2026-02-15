@@ -3,10 +3,8 @@ use std::fs;
 use std::process::{Command, Stdio};
 
 use super::{Scope, permissions, style};
+use crate::skills::{REINDEX_COMMAND_CONTENT, SKILL_CONTENT};
 use crate::storage::db_path_for_repo;
-
-const SKILL_CONTENT: &str = include_str!("../assets/skill.md");
-const REINDEX_COMMAND_CONTENT: &str = include_str!("../assets/reindex_command.md");
 
 fn binary_path() -> Result<String> {
     std::env::current_exe()?

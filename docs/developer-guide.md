@@ -60,9 +60,11 @@ Files on disk → tree-sitter parsing → ExtractedSymbol/ExtractedRef → SQLit
 src/
 ├── main.rs                 # CLI entry point
 ├── config.rs               # Project configuration (.ctxhelpr.json)
+├── skills.rs               # Shared skill/command file constants and refresh logic
 ├── cli/                    # enable, disable, perms, permissions & repos
 ├── server/                 # MCP server (stdio transport)
 ├── mcp/                    # Tool definitions and handlers
+├── watcher/                # Background file watching and startup reindex
 ├── indexer/                # Core indexing logic + language extractors
 │   └── languages/          # tree-sitter based extractors (TS, Python, Rust, Ruby, MD)
 ├── storage/                # SQLite persistence + schema + code tokenizer
@@ -80,9 +82,11 @@ src/
 - **`storage/`** - `SqliteStorage` wraps rusqlite. Schema is in `schema.sql` (loaded via `include_str!`). DB is per-repo, stored at `~/.cache/ctxhelpr/<hash>.db`. FTS5 virtual table with triggers keeps full-text index in sync. Provides `begin_transaction()`/`commit()` for batching - the indexer wraps all operations in a single transaction for performance.
 - **`output/`** - `CompactFormatter` produces token-efficient JSON with short keys (`n`, `k`, `f`, `l`, `sig`, `doc`, `id`).
 - **`cli/`** - `enable.rs` registers the MCP server, installs a skill file and `/reindex` command into `~/.claude/`. `disable.rs` removes the registration, skill file, command, index databases, and project config.
+- **`skills.rs`** - Shared constants (`SKILL_CONTENT`, `REINDEX_COMMAND_CONTENT`) and `refresh()` function for updating installed skill and command files. Used by `cli/update.rs`, `cli/enable.rs`, `mcp/`, and `watcher/`.
+- **`watcher/`** - Background file watcher. On server startup, reindexes all known repos (blocking) and refreshes their skill files, then watches for filesystem changes via `notify` and triggers incremental reindex through a debouncer.
 - **`assets/`** - Embedded markdown templates for the skill and slash command (included at compile time).
 
-The `lib.rs` re-exports `indexer`, `output`, and `storage` for use in integration tests.
+The `lib.rs` re-exports `config`, `indexer`, `output`, `storage`, `skills`, and `watcher` for use in integration tests.
 
 ### Tech stack
 

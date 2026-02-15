@@ -42,22 +42,28 @@ pub struct WatcherHandle {
 impl WatcherHandle {
     /// Start watching a newly-indexed repo.
     pub async fn watch_repo(&self, path: &str) {
-        let _ = self
+        if let Err(e) = self
             .cmd_tx
             .send(WatcherCommand::Watch {
                 repo_path: path.to_string(),
             })
-            .await;
+            .await
+        {
+            tracing::warn!(path = %path, error = %e, "Failed to send watch command");
+        }
     }
 
     /// Stop watching a deleted repo.
     pub async fn unwatch_repo(&self, path: &str) {
-        let _ = self
+        if let Err(e) = self
             .cmd_tx
             .send(WatcherCommand::Unwatch {
                 repo_path: path.to_string(),
             })
-            .await;
+            .await
+        {
+            tracing::warn!(path = %path, error = %e, "Failed to send unwatch command");
+        }
     }
 
     /// Shut down the watcher event loop.
@@ -119,6 +125,7 @@ pub async fn start(indexer: Arc<Indexer>, config_cache: Arc<ConfigCache>) -> Wat
                     duration_ms = stats.duration_ms,
                     "Startup reindex complete"
                 );
+                crate::skills::refresh(&crate::skills::base_dirs_for_repo(repo_path));
             }
             Ok(Err(e)) => {
                 tracing::warn!(path = %repo_path, error = %e, "Startup reindex failed");

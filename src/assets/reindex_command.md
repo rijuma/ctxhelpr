@@ -1,7 +1,7 @@
 ---
 name: reindex
 description: "(ctxhelpr) Force a full re-index of the current repository (rarely needed — ctxhelpr auto-indexes)"
-argument-hint: [path (optional, defaults to cwd)]
+argument-hint: "[path (optional, defaults to cwd)]"
 ---
 
 Force ctxhelpr to fully re-index this repository. This is rarely needed since
