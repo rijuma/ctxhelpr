@@ -4,6 +4,7 @@ pub mod enable;
 pub mod permissions;
 pub mod perms;
 pub mod repos;
+pub mod style;
 pub mod uninstall;
 pub mod update;
 

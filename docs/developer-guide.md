@@ -75,11 +75,11 @@ src/
 ### Key modules
 
 - **`mcp/`** - `CtxhelprServer` implements `ServerHandler` via rmcp macros (`#[tool_router]`, `#[tool_handler]`, `#[tool]`). Each MCP tool is a method. All tools take a repo path and open storage on demand. All handlers log at `tracing::info!` on entry with relevant parameters.
-- **`indexer/`** - `Indexer` walks the repo, delegates to language extractors via the `LanguageExtractor` trait, handles incremental re-indexing via SHA256 content hashing. `ExtractedSymbol` trees are recursive (children + references).
+- **`indexer/`** - `Indexer` walks the repo using the `ignore` crate (respects `.gitignore`), delegates to language extractors via the `LanguageExtractor` trait, handles incremental re-indexing via SHA256 content hashing. `ExtractedSymbol` trees are recursive (children + references).
 - **`indexer/languages/`** - One module per language (TypeScript, Python, Rust, Ruby, Markdown). Each extractor returns `Vec<ExtractedSymbol>` from tree-sitter AST traversal.
 - **`storage/`** - `SqliteStorage` wraps rusqlite. Schema is in `schema.sql` (loaded via `include_str!`). DB is per-repo, stored at `~/.cache/ctxhelpr/<hash>.db`. FTS5 virtual table with triggers keeps full-text index in sync. Provides `begin_transaction()`/`commit()` for batching - the indexer wraps all operations in a single transaction for performance.
 - **`output/`** - `CompactFormatter` produces token-efficient JSON with short keys (`n`, `k`, `f`, `l`, `sig`, `doc`, `id`).
-- **`cli/`** - `enable.rs` registers the MCP server, installs a skill file and `/index` command into `~/.claude/`. `disable.rs` removes the registration, skill file, and command.
+- **`cli/`** - `enable.rs` registers the MCP server, installs a skill file and `/reindex` command into `~/.claude/`. `disable.rs` removes the registration, skill file, command, index databases, and project config.
 - **`assets/`** - Embedded markdown templates for the skill and slash command (included at compile time).
 
 The `lib.rs` re-exports `indexer`, `output`, and `storage` for use in integration tests.

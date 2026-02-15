@@ -1,6 +1,6 @@
 use anyhow::Result;
 
-use super::{Scope, permissions, resolve_scope};
+use super::{Scope, permissions, resolve_scope, style};
 
 pub fn run(scope: Scope, all: bool, remove: bool) -> Result<()> {
     let (base_dir, scope_label) = resolve_scope(scope)?;
@@ -8,15 +8,31 @@ pub fn run(scope: Scope, all: bool, remove: bool) -> Result<()> {
 
     if all {
         permissions::grant_all(&settings_path)?;
-        println!("Granted all ctxhelpr tool permissions ({scope_label}).");
-        println!("  Settings: {}", settings_path.display());
+        println!(
+            "{}",
+            style::success(&format!(
+                "Granted all ctxhelpr tool permissions ({scope_label})."
+            ))
+        );
+        println!(
+            "  Settings: {}",
+            style::info(&settings_path.display().to_string())
+        );
         return Ok(());
     }
 
     if remove {
         permissions::revoke_all(&settings_path)?;
-        println!("Revoked all ctxhelpr tool permissions ({scope_label}).");
-        println!("  Settings: {}", settings_path.display());
+        println!(
+            "{}",
+            style::success(&format!(
+                "Revoked all ctxhelpr tool permissions ({scope_label})."
+            ))
+        );
+        println!(
+            "  Settings: {}",
+            style::info(&settings_path.display().to_string())
+        );
         return Ok(());
     }
 
@@ -32,7 +48,7 @@ pub fn run(scope: Scope, all: bool, remove: bool) -> Result<()> {
     {
         Ok(s) => s,
         Err(_) => {
-            println!("Cancelled. Permissions unchanged.");
+            println!("{}", style::warn("Cancelled. Permissions unchanged."));
             return Ok(());
         }
     };
@@ -47,9 +63,15 @@ pub fn run(scope: Scope, all: bool, remove: bool) -> Result<()> {
     let granted_count = selections.len();
     let total = permissions::TOOL_PERMISSIONS.len();
     println!(
-        "Updated ctxhelpr permissions: {granted_count}/{total} tools allowed ({scope_label})."
+        "{}",
+        style::success(&format!(
+            "Updated ctxhelpr permissions: {granted_count}/{total} tools allowed ({scope_label})."
+        ))
     );
-    println!("  Settings: {}", settings_path.display());
+    println!(
+        "  Settings: {}",
+        style::info(&settings_path.display().to_string())
+    );
 
     Ok(())
 }

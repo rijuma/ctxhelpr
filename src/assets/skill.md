@@ -18,22 +18,18 @@ Grep/Glob/Read for code navigation tasks:
 - Inspecting a symbol -> use `get_symbol_detail` (not Read)
 
 Reserve Grep/Glob/Read for non-code tasks: config files, text patterns, log messages.
+Note: ctxhelpr only indexes files tracked by git (respects .gitignore). For
+gitignored files (e.g. .env, build output, generated code), use Grep/Read instead.
 
 ### Startup workflow
-When starting work on a codebase, use the ctxhelpr MCP tools to quickly build context:
+Previously-indexed repos are automatically re-indexed when the MCP server starts,
+so the index is always fresh. For new repos, call `index_repository` first.
 
-### Startup workflow
-1. Call `index_status` to check if the repo is indexed and fresh
-2. If stale or unindexed, call `index_repository` first
-3. Call `get_overview` for the big picture (modules, key types, entry points)
-4. Drill into specific areas with `get_file_symbols` or `search_symbols`
-5. Follow references with `get_symbol_detail`, `get_references`, `get_dependencies`
+1. Call `get_overview` for the big picture (modules, key types, entry points)
+2. Drill into specific areas with `get_file_symbols` or `search_symbols`
+3. Follow references with `get_symbol_detail`, `get_references`, `get_dependencies`
 
-### Keep index fresh while coding
-After completing edits to files, call `update_files` with the list of
-files you just modified. This re-indexes only those files (~50ms) and
-keeps the index current without a full repo walk. Do this after each
-task or edit batch, not after every single line change.
+If the index seems off, use `/reindex` to force a full re-index.
 
 ### Output key legend
 n=name k=kind f=file l=lines(start-end) id=symbol_id sig=signature doc=doc_comment p=path
@@ -41,4 +37,4 @@ n=name k=kind f=file l=lines(start-end) id=symbol_id sig=signature doc=doc_comme
 ### Tips
 - Use symbol IDs to drill down (avoid re-searching)
 - Start broad (overview), go narrow (symbol detail)
-- Call `update_files` after edits to keep the index fresh
+- The index stays fresh automatically — no manual update calls needed

@@ -13,6 +13,7 @@ use crate::config::{ConfigCache, OutputConfig};
 use crate::indexer::Indexer;
 use crate::output::{CompactFormatter, OutputFormatter, TokenBudget};
 use crate::storage::{self, SqliteStorage};
+use crate::watcher::WatcherHandle;
 
 type McpError = rmcp::ErrorData;
 
@@ -24,14 +25,6 @@ pub struct RepoPathParams {
     pub path: String,
     /// Optional token budget — limits response size (approximate, 1 token ≈ 4 bytes)
     pub max_tokens: Option<usize>,
-}
-
-#[derive(Debug, Deserialize, JsonSchema)]
-pub struct UpdateFilesParams {
-    /// Absolute path to the repository root
-    pub path: String,
-    /// List of relative file paths to re-index
-    pub files: Vec<String>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -97,6 +90,7 @@ fn formatter(config: &OutputConfig) -> CompactFormatter {
 pub struct CtxhelprServer {
     indexer: Arc<Indexer>,
     config_cache: Arc<ConfigCache>,
+    watcher: WatcherHandle,
     tool_router: ToolRouter<Self>,
 }
 
@@ -107,10 +101,15 @@ fn open_storage(path: &str) -> Result<SqliteStorage, McpError> {
 
 #[tool_router]
 impl CtxhelprServer {
-    pub fn new() -> Self {
+    pub fn new(
+        indexer: Arc<Indexer>,
+        config_cache: Arc<ConfigCache>,
+        watcher: WatcherHandle,
+    ) -> Self {
         Self {
-            indexer: Arc::new(Indexer::new()),
-            config_cache: Arc::new(ConfigCache::new()),
+            indexer,
+            config_cache,
+            watcher,
             tool_router: Self::tool_router(),
         }
     }
@@ -136,34 +135,9 @@ impl CtxhelprServer {
             )
             .map_err(|e| McpError::internal_error(format!("Indexing failed: {e}"), None))?;
         refresh_skill_files(&params.path);
+        self.watcher.watch_repo(&params.path).await;
         Ok(CallToolResult::success(vec![Content::text(
             fmt.format_index_result(&stats),
-        )]))
-    }
-
-    #[tool(
-        description = "Re-index specific files after editing. Fast (~50ms per file), no full repo walk. Call this after completing edits."
-    )]
-    async fn update_files(
-        &self,
-        Parameters(params): Parameters<UpdateFilesParams>,
-    ) -> Result<CallToolResult, McpError> {
-        tracing::info!(path = %params.path, file_count = params.files.len(), "update_files");
-        let config = self.config_cache.get(&params.path);
-        let storage = open_storage(&params.path)?;
-        let fmt = formatter(&config.output);
-        let stats = self
-            .indexer
-            .update_files(
-                &params.path,
-                &params.files,
-                &storage,
-                &config.indexer.ignore,
-                config.indexer.max_file_size,
-            )
-            .map_err(|e| McpError::internal_error(format!("Update failed: {e}"), None))?;
-        Ok(CallToolResult::success(vec![Content::text(
-            fmt.format_update_result(&stats),
         )]))
     }
 
@@ -223,19 +197,20 @@ impl CtxhelprServer {
         let sym = storage
             .get_symbol_detail(&params.path, params.symbol_id)
             .map_err(|e| McpError::internal_error(format!("Query failed: {e}"), None))?;
-        let calls = storage
+        let all_deps = storage
             .get_dependencies(&params.path, params.symbol_id)
             .unwrap_or_else(|err| {
                 tracing::warn!(symbol_id = params.symbol_id, error = %err, "Failed to get dependencies");
                 Vec::new()
             });
+        let (type_refs, calls): (Vec<_>, Vec<_>) =
+            all_deps.into_iter().partition(|r| r.ref_kind == "type_ref");
         let called_by = storage
             .get_references(&params.path, params.symbol_id)
             .unwrap_or_else(|err| {
                 tracing::warn!(symbol_id = params.symbol_id, error = %err, "Failed to get references");
                 Vec::new()
             });
-        let type_refs = Vec::new();
         let budget = resolve_budget(params.max_tokens, config.output.max_tokens);
         let output = apply_budget(
             fmt.format_symbol_detail(&sym, &calls, &called_by, &type_refs),
@@ -256,10 +231,9 @@ impl CtxhelprServer {
         let config = self.config_cache.get(&params.path);
         let storage = open_storage(&params.path)?;
         let fmt = formatter(&config.output);
-        let mut results = storage
-            .search_symbols(&params.path, &params.query)
+        let results = storage
+            .search_symbols(&params.path, &params.query, config.search.max_results)
             .map_err(|e| McpError::internal_error(format!("Search failed: {e}"), None))?;
-        results.truncate(config.search.max_results);
         let budget = resolve_budget(params.max_tokens, config.output.max_tokens);
         let output = apply_budget(
             fmt.format_search_results(&params.query, &results),
@@ -384,7 +358,10 @@ impl CtxhelprServer {
         let mut errors: Vec<String> = Vec::new();
         for path in &params.paths {
             match storage::delete_repo_index(path) {
-                Ok(()) => deleted += 1,
+                Ok(()) => {
+                    self.watcher.unwatch_repo(path).await;
+                    deleted += 1;
+                }
                 Err(e) => errors.push(format!("{path}: {e}")),
             }
         }
@@ -400,7 +377,7 @@ impl CtxhelprServer {
 }
 
 const SKILL_CONTENT: &str = include_str!("../assets/skill.md");
-const INDEX_COMMAND_CONTENT: &str = include_str!("../assets/index_command.md");
+const REINDEX_COMMAND_CONTENT: &str = include_str!("../assets/reindex_command.md");
 
 fn refresh_skill_files(repo_path: &str) {
     let paths_to_check: Vec<std::path::PathBuf> = [
@@ -421,12 +398,23 @@ fn refresh_skill_files(repo_path: &str) {
             }
         }
 
-        let cmd_path = base.join("commands").join("index.md");
-        if cmd_path.exists() {
-            if let Err(e) = std::fs::write(&cmd_path, INDEX_COMMAND_CONTENT) {
-                tracing::debug!(path = %cmd_path.display(), error = %e, "failed to refresh command file");
+        // Install/refresh as reindex.md, clean up old index.md
+        let reindex_path = base.join("commands").join("reindex.md");
+        if reindex_path.exists() {
+            if let Err(e) = std::fs::write(&reindex_path, REINDEX_COMMAND_CONTENT) {
+                tracing::debug!(path = %reindex_path.display(), error = %e, "failed to refresh command file");
             } else {
-                tracing::debug!(path = %cmd_path.display(), "refreshed command file");
+                tracing::debug!(path = %reindex_path.display(), "refreshed command file");
+            }
+        }
+
+        // Clean up old /index command if present
+        let old_cmd_path = base.join("commands").join("index.md");
+        if old_cmd_path.exists() {
+            let _ = std::fs::remove_file(&old_cmd_path);
+            // Install reindex.md in its place
+            if !reindex_path.exists() {
+                let _ = std::fs::write(&reindex_path, REINDEX_COMMAND_CONTENT);
             }
         }
     }
@@ -445,7 +433,11 @@ impl ServerHandler for CtxhelprServer {
                  ctxhelpr returns structured symbol data with signatures, call graphs, and \
                  cross-references in a single call -- faster and more accurate than text search. \
                  Workflow: get_overview -> drill with search_symbols/get_file_symbols/\
-                 get_symbol_detail/get_references/get_dependencies. After edits, call update_files. \
+                 get_symbol_detail/get_references/get_dependencies. \
+                 The index is kept fresh automatically via background file watching -- no manual \
+                 update calls needed. \
+                 The index only includes git-tracked files (.gitignore is respected). \
+                 For gitignored files, use Grep/Glob/Read. \
                  Use Grep/Glob only for non-code searches (config files, text patterns, log messages). \
                  Output keys: n=name k=kind f=file l=lines id=symbol_id sig=signature doc=doc_comment p=path"
                     .into(),

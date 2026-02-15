@@ -43,17 +43,6 @@ impl OutputFormatter for CompactFormatter {
         .to_string()
     }
 
-    fn format_update_result(&self, stats: &IndexStats) -> String {
-        json!({
-            "status": "ok",
-            "updated": stats.files_changed,
-            "symbols": stats.symbols_count,
-            "refs": stats.refs_count,
-            "ms": stats.duration_ms,
-        })
-        .to_string()
-    }
-
     fn format_overview(&self, data: &OverviewData) -> String {
         let langs: Value = data
             .languages

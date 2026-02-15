@@ -151,6 +151,15 @@ fn cache_dir() -> PathBuf {
     dir.join("ctxhelpr")
 }
 
+/// Delete the entire ctxhelpr cache directory.
+pub fn delete_cache_dir() -> Result<()> {
+    let dir = cache_dir();
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir)?;
+    }
+    Ok(())
+}
+
 #[derive(Debug, Clone)]
 #[allow(dead_code)] // Fields available for future CLI and MCP tool output
 pub struct RepoInfo {
@@ -467,6 +476,32 @@ impl SqliteStorage {
         Ok(())
     }
 
+    /// Delete files by their relative paths within a repo. Returns how many were deleted.
+    pub fn delete_files_by_rel_paths(
+        &self,
+        repo_path: &str,
+        rel_paths: &[String],
+    ) -> Result<usize> {
+        let repo_id: i64 = self
+            .conn
+            .query_row(
+                "SELECT id FROM repositories WHERE abs_path = ?1",
+                params![repo_path],
+                |row| row.get(0),
+            )
+            .context("Repository not indexed")?;
+
+        let mut deleted = 0;
+        for rel_path in rel_paths {
+            let count = self.conn.execute(
+                "DELETE FROM files WHERE repo_id = ?1 AND rel_path = ?2",
+                params![repo_id, rel_path],
+            )?;
+            deleted += count;
+        }
+        Ok(deleted)
+    }
+
     // ── Symbol operations ──
 
     pub fn clear_file_symbols(&self, file_id: i64) -> Result<()> {
@@ -566,8 +601,10 @@ impl SqliteStorage {
 
         let mut updated2 = 0usize;
         for (ref_id, to_name) in &dotted_refs {
-            // Extract the method name after "this."
-            let method_name = &to_name[5..];
+            let method_name = match to_name.strip_prefix("this.") {
+                Some(m) => m,
+                None => continue,
+            };
             let resolved: Option<i64> = self
                 .conn
                 .query_row(
@@ -729,7 +766,12 @@ impl SqliteStorage {
         ).context("Symbol not found")
     }
 
-    pub fn search_symbols(&self, repo_path: &str, query: &str) -> Result<Vec<SearchHit>> {
+    pub fn search_symbols(
+        &self,
+        repo_path: &str,
+        query: &str,
+        limit: usize,
+    ) -> Result<Vec<SearchHit>> {
         let mut stmt = self.conn.prepare(
             "SELECT s.id, s.name, s.kind, s.file_rel_path, s.signature, s.doc_comment, s.start_line, s.end_line, rank
              FROM fts_symbols fts
@@ -737,9 +779,9 @@ impl SqliteStorage {
              JOIN repositories r ON s.repo_id = r.id
              WHERE r.abs_path = ?1 AND fts_symbols MATCH ?2
              ORDER BY rank
-             LIMIT 20",
+             LIMIT ?3",
         )?;
-        let rows = stmt.query_map(params![repo_path, query], |row| {
+        let rows = stmt.query_map(params![repo_path, query, limit as i64], |row| {
             Ok(SearchHit {
                 id: row.get(0)?,
                 name: row.get(1)?,

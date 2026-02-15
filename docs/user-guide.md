@@ -59,7 +59,7 @@ Extract the `.zip` file and place `ctxhelpr.exe` in a directory that is in your 
 ctxhelpr enable [-l | -g]
 ```
 
-Registers the MCP server, installs the skill file and `/index` command, prompts to grant tool permissions, and prints the database path. Use `-l` / `--local` for the project's `.claude/` directory, or `-g` / `--global` for `~/.claude/`. If neither is specified, you'll be prompted to choose.
+Registers the MCP server, installs the skill file and `/reindex` command, prompts to grant tool permissions, and prints the database path. Use `-l` / `--local` for the project's `.claude/` directory, or `-g` / `--global` for `~/.claude/`. If neither is specified, you'll be prompted to choose.
 
 ### Permissions management
 
@@ -75,7 +75,7 @@ Manages which ctxhelpr tools Claude Code can call without prompting. Without fla
 ctxhelpr disable [-l | -g]
 ```
 
-Asks for confirmation before proceeding. Removes all integrations and revokes tool permissions. Prompts to delete index databases: local disable offers to delete the current repo's DB (default: yes), global disable offers to delete all DBs (default: yes). If a `.ctxhelpr.json` exists in the current directory, offers to delete it (default: no).
+Removes all integrations, revokes tool permissions, deletes index databases (current repo for local, all repos for global), and removes `.ctxhelpr.json` if present.
 
 ### Update
 
@@ -91,7 +91,7 @@ Checks for a newer version on GitHub, downloads and verifies the release, and re
 ctxhelpr uninstall
 ```
 
-Completely removes ctxhelpr from your system. Asks for confirmation, then disables all integrations (global and local), and deletes the binary itself.
+Completely removes ctxhelpr from your system. Disables all integrations (global and local), deletes all index data, and removes the binary.
 
 ## MCP Tools Reference
 
@@ -156,7 +156,7 @@ ctxhelpr config show [--path dir]     # Show resolved config (defaults merged wi
 | `output.truncate_signatures`   | number         | `120`     | Max signature length before truncation               |
 | `output.truncate_doc_comments` | number         | `100`     | Max doc comment length in brief views                |
 | `search.max_results`           | number         | `20`      | Max search results returned                          |
-| `indexer.ignore`               | string[]       | `[]`      | Additional glob patterns of paths to ignore          |
+| `indexer.ignore`               | string[]       | `[]`      | Additional ignore patterns (on top of .gitignore)    |
 | `indexer.max_file_size`        | number         | `1048576` | Skip files larger than this (bytes)                  |
 
 ### Environment variables

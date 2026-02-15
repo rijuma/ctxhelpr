@@ -2,15 +2,15 @@ pub mod hasher;
 pub mod languages;
 
 use anyhow::{Context, Result};
+use ignore::WalkBuilder;
 use std::collections::HashMap;
 use std::path::Path;
 use std::time::Instant;
-use walkdir::WalkDir;
 
 use crate::storage::{IndexStats, SqliteStorage};
 use languages::LanguageExtractor;
 
-const DEFAULT_IGNORE: &[&str] = &[
+pub const DEFAULT_IGNORE: &[&str] = &[
     "node_modules",
     "target",
     ".git",
@@ -25,7 +25,19 @@ const DEFAULT_IGNORE: &[&str] = &[
     ".cache",
 ];
 
-const DEFAULT_IGNORE_SUFFIXES: &[&str] = &[".min.js", ".min.mjs", ".min.cjs", ".min.css"];
+pub const DEFAULT_IGNORE_SUFFIXES: &[&str] = &[".min.js", ".min.mjs", ".min.cjs", ".min.css"];
+
+/// Check if a single path component name matches a default ignore directory.
+pub fn is_ignored_component(name: &str) -> bool {
+    DEFAULT_IGNORE.contains(&name)
+}
+
+/// Check if a filename has an ignored suffix (e.g. `.min.js`).
+pub fn is_ignored_suffix(name: &str) -> bool {
+    DEFAULT_IGNORE_SUFFIXES
+        .iter()
+        .any(|suffix| name.ends_with(suffix))
+}
 
 #[derive(Debug, Clone)]
 pub struct ExtractedSymbol {
@@ -187,12 +199,17 @@ impl Indexer {
 
         let mut parser = tree_sitter::Parser::new();
 
-        for entry in WalkDir::new(&abs_path)
-            .into_iter()
+        for entry in WalkBuilder::new(&abs_path)
+            .hidden(false)
+            .parents(true)
+            .git_ignore(true)
+            .git_global(true)
+            .git_exclude(true)
             .filter_entry(|e| !is_ignored(e))
+            .build()
             .filter_map(|e| e.ok())
         {
-            if !entry.file_type().is_file() {
+            if !entry.file_type().is_some_and(|ft| ft.is_file()) {
                 continue;
             }
 
@@ -290,6 +307,8 @@ impl Indexer {
         let repo_id = storage.ensure_repo(abs_path_str)?;
         storage.begin_transaction()?;
 
+        let mut existing_map = build_existing_file_map(storage, repo_id)?;
+
         let mut parser = tree_sitter::Parser::new();
         let mut total_symbols = 0;
         let mut total_refs = 0;
@@ -321,11 +340,13 @@ impl Indexer {
                 None => continue,
             };
 
+            let previous_entry = existing_map.remove(rel_path.as_str());
+
             match process_file(
                 rel_path,
                 &full_path,
                 extractor,
-                &None,
+                &previous_entry,
                 &mut parser,
                 storage,
                 repo_id,
@@ -452,20 +473,22 @@ fn remove_deleted_files(
     Ok(count)
 }
 
-fn is_ignored(entry: &walkdir::DirEntry) -> bool {
+fn is_ignored(entry: &ignore::DirEntry) -> bool {
     let name = entry.file_name().to_str().unwrap_or("");
-    if entry.file_type().is_dir() {
-        return DEFAULT_IGNORE.contains(&name);
-    }
-    if entry.file_type().is_file() {
-        return DEFAULT_IGNORE_SUFFIXES
-            .iter()
-            .any(|suffix| name.ends_with(suffix));
+    if let Some(ft) = entry.file_type() {
+        if ft.is_dir() {
+            return DEFAULT_IGNORE.contains(&name);
+        }
+        if ft.is_file() {
+            return DEFAULT_IGNORE_SUFFIXES
+                .iter()
+                .any(|suffix| name.ends_with(suffix));
+        }
     }
     false
 }
 
-fn matches_ignore_pattern(rel_path: &str, patterns: &[String]) -> bool {
+pub fn matches_ignore_pattern(rel_path: &str, patterns: &[String]) -> bool {
     patterns.iter().any(|pattern| {
         if let Some(suffix) = pattern.strip_prefix('*') {
             // e.g. "*.min.js" → suffix match ".min.js"

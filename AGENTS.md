@@ -40,7 +40,7 @@ Key modules:
 - **`indexer/languages/`** — One module per language (TypeScript, Python, Rust, Ruby, Markdown). Each extractor returns `Vec<ExtractedSymbol>` from tree-sitter AST traversal.
 - **`storage/`** — `SqliteStorage` wraps rusqlite. Schema is in `schema.sql` (loaded via `include_str!`). DB is per-repo, stored at `~/.cache/ctxhelpr/<hash>.db`. FTS5 virtual table with triggers keeps full-text index in sync. Provides `begin_transaction()`/`commit()` for batching — the indexer wraps all operations in a single transaction for performance.
 - **`output/`** — `CompactFormatter` produces token-efficient JSON with short keys (`n`, `k`, `f`, `l`, `sig`, `doc`, `id`).
-- **`cli/`** — `enable.rs` registers the MCP server, installs a skill file and `/index` command into `~/.claude/`. `disable.rs` reverses this.
+- **`cli/`** — `enable.rs` registers the MCP server, installs a skill file and `/reindex` command into `~/.claude/`. `disable.rs` reverses this.
 - **`assets/`** — Embedded markdown templates for the skill and slash command (included at compile time).
 
 The `lib.rs` re-exports `indexer`, `output`, and `storage` for use in integration tests.
