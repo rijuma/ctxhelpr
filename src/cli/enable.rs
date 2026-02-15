@@ -1,6 +1,6 @@
 use anyhow::Result;
 use std::fs;
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 use super::{Scope, permissions, style};
 use crate::storage::db_path_for_repo;
@@ -57,42 +57,66 @@ pub fn run(scope: Scope) -> Result<()> {
 
     // 1. Register MCP server
     let bin = binary_path()?;
-    print!("  Registering MCP server (scope: {mcp_scope})... ");
-    let status = Command::new("claude")
-        .args([
-            "mcp",
-            "add",
-            "--transport",
-            "stdio",
-            "--scope",
-            mcp_scope,
-            "ctxhelpr",
-            "--",
-            &bin,
-            "serve",
-        ])
-        .status();
+    let add_args = [
+        "mcp",
+        "add",
+        "--transport",
+        "stdio",
+        "--scope",
+        mcp_scope,
+        "ctxhelpr",
+        "--",
+        &bin,
+        "serve",
+    ];
 
-    match status {
-        Ok(s) if s.success() => println!("{}", style::done()),
-        Ok(s) => {
-            println!(
-                "{}",
-                style::warn(&format!("warning (exit code {})", s.code().unwrap_or(-1)))
-            );
-            println!("    You may need to register manually:");
-            println!(
-                "    claude mcp add --transport stdio --scope {mcp_scope} ctxhelpr -- {} serve",
-                bin
-            );
+    print!("  Registering MCP server (scope: {mcp_scope})... ");
+    let add_result = Command::new("claude")
+        .args(add_args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output();
+
+    match add_result {
+        Ok(output) if output.status.success() => println!("{}", style::done()),
+        Ok(output) => {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            if stderr.contains("already exists") {
+                print!("{} ", style::info("already registered, updating..."));
+
+                let remove_ok = Command::new("claude")
+                    .args(["mcp", "remove", "--scope", mcp_scope, "ctxhelpr"])
+                    .stdout(Stdio::null())
+                    .stderr(Stdio::null())
+                    .status()
+                    .is_ok_and(|s| s.success());
+
+                if remove_ok {
+                    let readd = Command::new("claude")
+                        .args(add_args)
+                        .stdout(Stdio::null())
+                        .stderr(Stdio::null())
+                        .status();
+
+                    match readd {
+                        Ok(s) if s.success() => println!("{}", style::done()),
+                        _ => println!("{}", style::warn("failed to re-register")),
+                    }
+                } else {
+                    println!("{}", style::warn("failed to remove existing registration"));
+                }
+            } else {
+                println!(
+                    "{}",
+                    style::warn(&format!(
+                        "warning (exit code {})",
+                        output.status.code().unwrap_or(-1)
+                    ))
+                );
+            }
         }
-        Err(e) => {
-            println!("{}", style::warn(&format!("skipped ({e})")));
-            println!("    Claude CLI not found. Register manually:");
-            println!(
-                "    claude mcp add --transport stdio --scope {mcp_scope} ctxhelpr -- {} serve",
-                bin
-            );
+        Err(_) => {
+            println!("{}", style::warn("skipped (Claude CLI not found)"));
         }
     }
 
