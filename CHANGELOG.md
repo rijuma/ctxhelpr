@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.2 - 2026-02-15
+- Updated output messages for the enable command (#36)
+
 ## 0.2.1 - 2026-02-15
 - Added version output command and benchmarking instructions (#34)
 
