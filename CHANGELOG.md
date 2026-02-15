@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.1 - 2026-02-15
+- Added version output command and benchmarking instructions (#34)
+
 ## 0.2.0 - 2026-02-15
 - Changed reindex behavior by watching instead of manual run (#32)
 
