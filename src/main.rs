@@ -8,6 +8,7 @@ mod mcp;
 mod output;
 mod server;
 mod storage;
+mod watcher;
 
 use cli::Scope;
 use cli::config_cmd::ConfigArgs;

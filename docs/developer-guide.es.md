@@ -75,11 +75,11 @@ src/
 ### Módulos principales
 
 - **`mcp/`** - `CtxhelprServer` implementa `ServerHandler` vía macros de rmcp (`#[tool_router]`, `#[tool_handler]`, `#[tool]`). Cada herramienta MCP es un método. Todas las herramientas toman una ruta de repo y abren el almacenamiento bajo demanda. Todos los handlers loguean con `tracing::info!` al iniciar con los parámetros relevantes.
-- **`indexer/`** - `Indexer` recorre el repo, delega a extractores de lenguaje vía el trait `LanguageExtractor`, maneja la re-indexación incremental vía hashing SHA256 de contenido. Los árboles de `ExtractedSymbol` son recursivos (hijos + referencias).
+- **`indexer/`** - `Indexer` recorre el repo usando el crate `ignore` (respeta `.gitignore`), delega a extractores de lenguaje vía el trait `LanguageExtractor`, maneja la re-indexación incremental vía hashing SHA256 de contenido. Los árboles de `ExtractedSymbol` son recursivos (hijos + referencias).
 - **`indexer/languages/`** - Un módulo por lenguaje (TypeScript, Python, Rust, Ruby, Markdown). Cada extractor devuelve `Vec<ExtractedSymbol>` del recorrido del AST de tree-sitter.
 - **`storage/`** - `SqliteStorage` envuelve rusqlite. El esquema está en `schema.sql` (cargado vía `include_str!`). La DB es por repo, almacenada en `~/.cache/ctxhelpr/<hash>.db`. La tabla virtual FTS5 con triggers mantiene el índice full-text sincronizado. Provee `begin_transaction()`/`commit()` para batching - el indexer envuelve todas las operaciones en una sola transacción por rendimiento.
 - **`output/`** - `CompactFormatter` produce JSON eficiente en tokens con claves cortas (`n`, `k`, `f`, `l`, `sig`, `doc`, `id`).
-- **`cli/`** - `enable.rs` registra el servidor MCP, instala un archivo de skill y el comando `/index` en `~/.claude/`. `disable.rs` elimina el registro, el archivo de skill y el comando.
+- **`cli/`** - `enable.rs` registra el servidor MCP, instala un archivo de skill y el comando `/reindex` en `~/.claude/`. `disable.rs` elimina el registro, el archivo de skill, el comando, las bases de datos de índice y la configuración del proyecto.
 - **`assets/`** - Templates markdown embebidos para el skill y slash command (incluidos en tiempo de compilación).
 
 `lib.rs` re-exporta `indexer`, `output` y `storage` para uso en tests de integración.

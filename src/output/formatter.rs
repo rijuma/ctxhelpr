@@ -15,5 +15,4 @@ pub trait OutputFormatter: Send + Sync {
     fn format_references(&self, symbol_id: i64, refs: &[RefRecord]) -> String;
     fn format_dependencies(&self, symbol_id: i64, deps: &[RefRecord]) -> String;
     fn format_index_status(&self, status: &IndexStatus) -> String;
-    fn format_update_result(&self, stats: &IndexStats) -> String;
 }

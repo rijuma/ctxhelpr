@@ -52,7 +52,9 @@ Files are selected based on:
 
 - **Extension mapping**: Each language extractor declares which extensions it handles (e.g., `.ts`, `.tsx`, `.js`, `.jsx` for TypeScript)
 - **Size limit**: Files larger than 1 MiB (configurable via `.ctxhelpr.json`) are skipped
-- **Ignore patterns**: Standard directories are excluded: `node_modules`, `target`, `.git`, `dist`, `build`, `__pycache__`, `.venv`, `vendor`, `.next`, `.nuxt`, `coverage`, `.cache`
+- **Gitignore support**: `.gitignore` files are respected automatically (including nested and global gitignore). Files ignored by git are skipped during indexing.
+- **Default ignore patterns**: As a safety net (for repos without `.gitignore`), standard directories are also excluded: `node_modules`, `target`, `.git`, `dist`, `build`, `__pycache__`, `.venv`, `vendor`, `.next`, `.nuxt`, `coverage`, `.cache`
+- **User config patterns**: Additional ignore patterns can be configured via `.ctxhelpr.json` `indexer.ignore` — these are applied on top of `.gitignore` and the default list
 
 ## Symbol Extraction
 
@@ -199,7 +201,7 @@ Responses can be budget-constrained:
 
 ### Per-Repository Databases
 
-Each repository gets its own SQLite database at `~/.cache/ctxhelpr/<sha256-prefix>.db`. This avoids cross-repo interference and makes cleanup simple. Indexed repos can be listed and deleted via the `repos list` / `repos delete` CLI subcommands or the `list_repos` / `delete_repos` MCP tools.
+Each repository gets its own SQLite database at `~/.cache/ctxhelpr/<sha256-prefix>.db`. This avoids cross-repo interference and makes cleanup simple. Indexed repos can be listed and deleted via `repos list` / `repos delete` CLI subcommands or the `list_repos` / `delete_repos` MCP tools. The `disable` command also deletes relevant index databases, and `uninstall` removes the entire cache directory.
 
 ### WAL Mode
 
@@ -262,7 +264,7 @@ This means FTS is always consistent with the symbols table without manual rebuil
 
 ### Symlinks
 
-- `walkdir` follows symlinks by default. Circular symlinks could cause infinite loops. The default ignore list mitigates this for common cases.
+- The `ignore` crate (used for directory walking) does not follow symlinks by default, avoiding circular symlink issues.
 
 ### Large Monorepos
 

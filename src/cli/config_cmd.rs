@@ -2,6 +2,7 @@ use anyhow::Result;
 use clap::{Args, Subcommand};
 use std::path::Path;
 
+use super::style;
 use crate::config::{
     CONFIG_FILENAME, Config, ConfigError, GLOBAL_CONFIG_DIR, GLOBAL_CONFIG_FILENAME,
     global_config_path,
@@ -62,26 +63,38 @@ fn run_init_local() -> Result<()> {
     let config_path = Path::new(CONFIG_FILENAME);
     if config_path.exists() {
         println!(
-            "{} already exists in the current directory.",
-            CONFIG_FILENAME
+            "{}",
+            style::warn(&format!(
+                "{} already exists in the current directory.",
+                CONFIG_FILENAME
+            ))
         );
         return Ok(());
     }
 
     let template = serde_json::to_string_pretty(&Config::default())?;
     std::fs::write(config_path, format!("{template}\n"))?;
-    println!("Created {}", config_path.display());
+    println!(
+        "{}",
+        style::success(&format!("Created {}", config_path.display()))
+    );
     Ok(())
 }
 
 fn run_init_global() -> Result<()> {
     let Some(config_path) = global_config_path() else {
-        println!("Could not determine config directory for this platform.");
+        println!(
+            "{}",
+            style::error("Could not determine config directory for this platform.")
+        );
         return Ok(());
     };
 
     if config_path.exists() {
-        println!("{} already exists.", config_path.display());
+        println!(
+            "{}",
+            style::warn(&format!("{} already exists.", config_path.display()))
+        );
         return Ok(());
     }
 
@@ -91,7 +104,10 @@ fn run_init_global() -> Result<()> {
 
     let template = serde_json::to_string_pretty(&Config::default())?;
     std::fs::write(&config_path, format!("{template}\n"))?;
-    println!("Created {}", config_path.display());
+    println!(
+        "{}",
+        style::success(&format!("Created {}", config_path.display()))
+    );
     Ok(())
 }
 
@@ -99,7 +115,7 @@ fn run_validate_local(path: Option<String>) -> Result<()> {
     let dir = path.unwrap_or_else(|| ".".to_string());
     match Config::validate(&dir) {
         Ok(config) => {
-            println!("Valid\n");
+            println!("{}\n", style::success("Valid"));
             print_config_summary(&config);
             Ok(())
         }
@@ -108,8 +124,8 @@ fn run_validate_local(path: Option<String>) -> Result<()> {
             Ok(())
         }
         Err(e) => {
-            println!("Error: {e}");
-            std::process::exit(1);
+            println!("{}", style::error(&format!("Error: {e}")));
+            Err(anyhow::anyhow!("Config validation failed: {e}"))
         }
     }
 }
@@ -117,7 +133,7 @@ fn run_validate_local(path: Option<String>) -> Result<()> {
 fn run_validate_global() -> Result<()> {
     match Config::validate_global() {
         Ok(config) => {
-            println!("Valid\n");
+            println!("{}\n", style::success("Valid"));
             print_config_summary(&config);
             Ok(())
         }
@@ -131,8 +147,8 @@ fn run_validate_global() -> Result<()> {
             Ok(())
         }
         Err(e) => {
-            println!("Error: {e}");
-            std::process::exit(1);
+            println!("{}", style::error(&format!("Error: {e}")));
+            Err(anyhow::anyhow!("Config validation failed: {e}"))
         }
     }
 }

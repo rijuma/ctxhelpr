@@ -38,9 +38,13 @@ hex = "0.4"
 clap = { version = "4", features = ["derive"] }
 dirs = "6"
 dialoguer = "0.12"
+owo-colors = { version = "4", features = ["supports-colors"] }
+
+# File watching
+notify = "7"
 
 # Utilities
-walkdir = "2"
+ignore = "0.4"
 anyhow = "1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

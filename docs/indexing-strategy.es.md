@@ -52,7 +52,9 @@ Los archivos se seleccionan basándose en:
 
 - **Mapeo de extensiones**: Cada extractor de lenguaje declara qué extensiones maneja (ej., `.ts`, `.tsx`, `.js`, `.jsx` para TypeScript)
 - **Límite de tamaño**: Los archivos más grandes que 1 MiB (configurable vía `.ctxhelpr.json`) se omiten
-- **Patrones de ignorar**: Los directorios estándar se excluyen: `node_modules`, `target`, `.git`, `dist`, `build`, `__pycache__`, `.venv`, `vendor`, `.next`, `.nuxt`, `coverage`, `.cache`
+- **Soporte de gitignore**: Los archivos `.gitignore` se respetan automáticamente (incluyendo gitignore anidados y globales). Los archivos ignorados por git se omiten durante la indexación.
+- **Patrones de ignorar por defecto**: Como red de seguridad (para repos sin `.gitignore`), los directorios estándar también se excluyen: `node_modules`, `target`, `.git`, `dist`, `build`, `__pycache__`, `.venv`, `vendor`, `.next`, `.nuxt`, `coverage`, `.cache`
+- **Patrones de configuración de usuario**: Se pueden configurar patrones de ignorar adicionales vía `.ctxhelpr.json` `indexer.ignore` — estos se aplican sobre `.gitignore` y la lista por defecto
 
 ## Extracción de Símbolos
 
@@ -199,7 +201,7 @@ Las respuestas pueden limitarse por presupuesto:
 
 ### Bases de Datos por Repositorio
 
-Cada repositorio obtiene su propia base de datos SQLite en `~/.cache/ctxhelpr/<sha256-prefix>.db`. Esto evita interferencia entre repos y hace la limpieza simple. Los repos indexados se pueden listar y eliminar vía los subcomandos `repos list` / `repos delete` del CLI o las herramientas MCP `list_repos` / `delete_repos`.
+Cada repositorio obtiene su propia base de datos SQLite en `~/.cache/ctxhelpr/<sha256-prefix>.db`. Esto evita interferencia entre repos y hace la limpieza simple. Los repos indexados se pueden listar y eliminar vía los subcomandos `repos list` / `repos delete` del CLI o las herramientas MCP `list_repos` / `delete_repos`. El comando `disable` también elimina las bases de datos de índice relevantes, y `uninstall` elimina todo el directorio de caché.
 
 ### Modo WAL
 
@@ -262,7 +264,7 @@ Esto significa que FTS siempre está consistente con la tabla de símbolos sin r
 
 ### Symlinks
 
-- `walkdir` sigue symlinks por defecto. Los symlinks circulares podrían causar loops infinitos. La lista de ignorados por defecto mitiga esto para los casos comunes.
+- El crate `ignore` (usado para recorrer directorios) no sigue symlinks por defecto, evitando problemas de symlinks circulares.
 
 ### Monorepos Grandes
 

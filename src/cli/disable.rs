@@ -1,26 +1,17 @@
 use anyhow::Result;
-use dialoguer::Confirm;
 use std::fs;
 use std::process::Command;
 
-use super::{Scope, permissions, resolve_scope};
+use super::{Scope, permissions, resolve_scope, style};
 use crate::storage;
 
 pub fn run(scope: Scope) -> Result<()> {
-    let (_, scope_label) = resolve_scope(scope)?;
-
-    if !Confirm::new()
-        .with_prompt(format!("Disable ctxhelpr integration ({scope_label})?"))
-        .default(true)
-        .interact()?
-    {
-        println!("Cancelled.");
-        return Ok(());
-    }
-
     run_internal(scope)?;
 
-    println!("\nDisable complete. Restart Claude Code to apply changes.");
+    println!(
+        "\n{}",
+        style::success("Disable complete. Restart Claude Code to apply changes.")
+    );
 
     Ok(())
 }
@@ -30,7 +21,10 @@ pub fn run_internal(scope: Scope) -> Result<()> {
     let is_global = matches!(scope, Scope::Global);
     let (base_dir, scope_label) = resolve_scope(scope)?;
 
-    println!("\nDisabling ctxhelpr ({scope_label})...\n");
+    println!(
+        "\n{}\n",
+        style::heading(&format!("Disabling ctxhelpr ({scope_label})..."))
+    );
 
     // 1. Remove MCP server registration
     print!("  Removing MCP server... ");
@@ -39,119 +33,65 @@ pub fn run_internal(scope: Scope) -> Result<()> {
         .status();
 
     match status {
-        Ok(s) if s.success() => println!("done"),
-        Ok(_) => println!("not found (may already be removed)"),
-        Err(_) => println!("skipped (claude CLI not found)"),
+        Ok(s) if s.success() => println!("{}", style::done()),
+        Ok(_) => println!("{}", style::info("not found (may already be removed)")),
+        Err(_) => println!("{}", style::info("skipped (claude CLI not found)")),
     }
 
     // 2. Remove skill
     let skill_dir = base_dir.join("skills").join("ctxhelpr");
     if skill_dir.exists() {
         fs::remove_dir_all(&skill_dir)?;
-        println!("  Removed skill directory");
+        println!("  {}", style::info("Removed skill directory"));
     }
 
-    // 3. Remove slash command
-    let cmd_path = base_dir.join("commands").join("index.md");
-    if cmd_path.exists() {
-        fs::remove_file(&cmd_path)?;
-        println!("  Removed /index command");
+    // 3. Remove slash commands (both old /index and new /reindex)
+    let old_cmd_path = base_dir.join("commands").join("index.md");
+    if old_cmd_path.exists() {
+        fs::remove_file(&old_cmd_path)?;
+        println!("  {}", style::info("Removed /index command"));
+    }
+    let reindex_cmd_path = base_dir.join("commands").join("reindex.md");
+    if reindex_cmd_path.exists() {
+        fs::remove_file(&reindex_cmd_path)?;
+        println!("  {}", style::info("Removed /reindex command"));
     }
 
     // 4. Revoke permissions (non-fatal)
     let settings_path = base_dir.join("settings.json");
     match permissions::revoke_all(&settings_path) {
-        Ok(()) => println!("  Revoked ctxhelpr tool permissions"),
-        Err(e) => println!("  Could not revoke permissions: {e}"),
+        Ok(()) => println!("  {}", style::info("Revoked ctxhelpr tool permissions")),
+        Err(e) => println!(
+            "  {}",
+            style::warn(&format!("Could not revoke permissions: {e}"))
+        ),
     }
 
-    // 5. Offer to delete index databases
+    // 5. Delete index databases
     if is_local {
-        prompt_delete_local_db()?;
+        let current_dir = std::env::current_dir()?;
+        let repo_path = current_dir.to_str().unwrap_or("");
+        let db_path = storage::db_path_for_repo(repo_path);
+        if db_path.exists() {
+            storage::delete_repo_index(repo_path)?;
+            println!("  {}", style::info("Deleted index database"));
+        }
     } else if is_global {
-        prompt_delete_all_dbs()?;
-    }
-
-    // 6. Offer to delete project configuration
-    prompt_delete_config()?;
-
-    Ok(())
-}
-
-fn prompt_delete_local_db() -> Result<()> {
-    let current_dir = std::env::current_dir()?;
-    let repo_path = current_dir.to_str().unwrap_or("");
-    let db_path = storage::db_path_for_repo(repo_path);
-    if !db_path.exists() {
-        return Ok(());
-    }
-
-    let db_size = fs::metadata(&db_path).map(|m| m.len()).unwrap_or(0);
-    let size_str = format_size(db_size);
-
-    println!();
-    if Confirm::new()
-        .with_prompt(format!(
-            "Delete index database for this repository? ({size_str})"
-        ))
-        .default(true)
-        .interact()?
-    {
-        storage::delete_repo_index(repo_path)?;
-        println!("  Deleted index database");
-    }
-    Ok(())
-}
-
-fn prompt_delete_all_dbs() -> Result<()> {
-    let repos = storage::list_indexed_repos()?;
-    if repos.is_empty() {
-        return Ok(());
-    }
-
-    let total_size: u64 = repos.iter().map(|r| r.db_size_bytes).sum();
-    let size_str = format_size(total_size);
-
-    println!();
-    if Confirm::new()
-        .with_prompt(format!(
-            "Delete all indexed repository databases? ({} repositor{}, {size_str})",
-            repos.len(),
-            if repos.len() == 1 { "y" } else { "ies" },
-        ))
-        .default(true)
-        .interact()?
-    {
         let count = storage::delete_all_repo_indexes()?;
-        println!("  Deleted {count} index database(s)");
+        if count > 0 {
+            println!(
+                "  {}",
+                style::info(&format!("Deleted {count} index database(s)"))
+            );
+        }
     }
-    Ok(())
-}
 
-fn prompt_delete_config() -> Result<()> {
+    // 6. Delete project configuration
     let config_path = std::env::current_dir()?.join(".ctxhelpr.json");
-    if !config_path.exists() {
-        return Ok(());
-    }
-
-    println!();
-    if Confirm::new()
-        .with_prompt("Delete project configuration (.ctxhelpr.json)?")
-        .default(false)
-        .interact()?
-    {
+    if config_path.exists() {
         fs::remove_file(&config_path)?;
-        println!("  Deleted .ctxhelpr.json");
+        println!("  {}", style::info("Deleted .ctxhelpr.json"));
     }
-    Ok(())
-}
 
-fn format_size(bytes: u64) -> String {
-    if bytes < 1024 {
-        format!("{bytes} B")
-    } else if bytes < 1024 * 1024 {
-        format!("{:.1} KB", bytes as f64 / 1024.0)
-    } else {
-        format!("{:.1} MB", bytes as f64 / (1024.0 * 1024.0))
-    }
+    Ok(())
 }

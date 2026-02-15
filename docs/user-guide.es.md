@@ -59,7 +59,7 @@ Extraé el archivo `.zip` y colocá `ctxhelpr.exe` en un directorio que esté en
 ctxhelpr enable [-l | -g]
 ```
 
-Registra el servidor MCP, instala el archivo de skill y el comando `/index`, ofrece otorgar permisos a las herramientas, y muestra la ruta de la base de datos. Usá `-l` / `--local` para el directorio `.claude/` del proyecto, o `-g` / `--global` para `~/.claude/`. Si no se especifica ninguno, se te preguntará cuál elegir.
+Registra el servidor MCP, instala el archivo de skill y el comando `/reindex`, ofrece otorgar permisos a las herramientas, y muestra la ruta de la base de datos. Usá `-l` / `--local` para el directorio `.claude/` del proyecto, o `-g` / `--global` para `~/.claude/`. Si no se especifica ninguno, se te preguntará cuál elegir.
 
 ### Gestión de permisos
 
@@ -75,7 +75,7 @@ Gestiona qué herramientas de ctxhelpr puede llamar Claude Code sin preguntar. S
 ctxhelpr disable [-l | -g]
 ```
 
-Pide confirmación antes de proceder. Elimina todas las integraciones y revoca permisos de herramientas. Ofrece eliminar las bases de datos de índice: deshabilitar localmente ofrece eliminar la DB del repo actual (por defecto: sí), globalmente ofrece eliminar todas las DBs (por defecto: sí). Si existe un `.ctxhelpr.json` en el directorio actual, ofrece eliminarlo (por defecto: no).
+Elimina todas las integraciones, revoca permisos de herramientas, elimina las bases de datos de índice (repo actual para local, todos los repos para global), y elimina `.ctxhelpr.json` si existe.
 
 ### Actualizar
 
@@ -91,7 +91,7 @@ Busca una versión más reciente en GitHub, descarga y verifica el release, y re
 ctxhelpr uninstall
 ```
 
-Elimina completamente ctxhelpr de tu sistema. Pide confirmación, luego deshabilita todas las integraciones (global y local), y elimina el binario.
+Elimina completamente ctxhelpr de tu sistema. Deshabilita todas las integraciones (global y local), elimina todos los datos de índice, y elimina el binario.
 
 ## Referencia de Herramientas MCP
 
@@ -156,7 +156,7 @@ ctxhelpr config show [--path dir]     # Mostrar configuración resuelta (default
 | `output.truncate_signatures`   | number        | `120`     | Largo máximo de firma antes de truncar                      |
 | `output.truncate_doc_comments` | number        | `100`     | Largo máximo de doc comment en vistas resumidas             |
 | `search.max_results`           | number        | `20`      | Máximo de resultados de búsqueda                            |
-| `indexer.ignore`               | string[]      | `[]`      | Patrones glob adicionales de rutas a ignorar                |
+| `indexer.ignore`               | string[]      | `[]`      | Patrones de ignorar adicionales (sobre .gitignore)          |
 | `indexer.max_file_size`        | number        | `1048576` | Omitir archivos más grandes que esto (bytes)                |
 
 ### Variables de entorno

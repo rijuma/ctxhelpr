@@ -68,7 +68,7 @@ pub fn current_grants(path: &Path) -> Result<Vec<bool>> {
 
 pub fn set_grants(path: &Path, grants: &[bool]) -> Result<()> {
     let mut settings = read_settings(path)?;
-    apply_grants(&mut settings, grants);
+    apply_grants(&mut settings, grants)?;
     write_settings(path, &settings)
 }
 
@@ -80,20 +80,22 @@ pub fn revoke_all(path: &Path) -> Result<()> {
     set_grants(path, &[false; 11])
 }
 
-fn apply_grants(settings: &mut Value, grants: &[bool]) {
+fn apply_grants(settings: &mut Value, grants: &[bool]) -> Result<()> {
     let permissions = settings
         .as_object_mut()
-        .expect("settings must be an object")
+        .ok_or_else(|| anyhow::anyhow!("settings is not a JSON object"))?
         .entry("permissions")
         .or_insert_with(|| serde_json::json!({}));
 
     let allow = permissions
         .as_object_mut()
-        .expect("permissions must be an object")
+        .ok_or_else(|| anyhow::anyhow!("permissions is not a JSON object"))?
         .entry("allow")
         .or_insert_with(|| serde_json::json!([]));
 
-    let arr = allow.as_array_mut().expect("allow must be an array");
+    let arr = allow
+        .as_array_mut()
+        .ok_or_else(|| anyhow::anyhow!("allow is not a JSON array"))?;
 
     // Remove existing ctxhelpr entries
     arr.retain(|v| {
@@ -108,6 +110,8 @@ fn apply_grants(settings: &mut Value, grants: &[bool]) {
             arr.push(Value::String(TOOL_PERMISSIONS[i].to_string()));
         }
     }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -118,7 +122,7 @@ mod tests {
     #[test]
     fn grant_all_to_empty_settings() {
         let mut settings = json!({});
-        apply_grants(&mut settings, &[true; 11]);
+        apply_grants(&mut settings, &[true; 11]).unwrap();
 
         let allow = settings["permissions"]["allow"].as_array().unwrap();
         assert_eq!(allow.len(), 11);
@@ -136,7 +140,7 @@ mod tests {
             },
             "other_key": true
         });
-        apply_grants(&mut settings, &[true; 11]);
+        apply_grants(&mut settings, &[true; 11]).unwrap();
 
         let allow = settings["permissions"]["allow"].as_array().unwrap();
         assert_eq!(allow.len(), 13); // 2 existing + 11 ctxhelpr
@@ -158,7 +162,7 @@ mod tests {
                 ]
             }
         });
-        apply_grants(&mut settings, &[false; 11]);
+        apply_grants(&mut settings, &[false; 11]).unwrap();
 
         let allow = settings["permissions"]["allow"].as_array().unwrap();
         assert_eq!(allow.len(), 2);
@@ -176,7 +180,7 @@ mod tests {
         grants[7] = true; // get_dependencies
         grants[8] = true; // index_status
 
-        apply_grants(&mut settings, &grants);
+        apply_grants(&mut settings, &grants).unwrap();
 
         let allow = settings["permissions"]["allow"].as_array().unwrap();
         assert_eq!(allow.len(), 5);
@@ -190,10 +194,95 @@ mod tests {
     #[test]
     fn idempotent_grant_no_duplicates() {
         let mut settings = json!({});
-        apply_grants(&mut settings, &[true; 11]);
-        apply_grants(&mut settings, &[true; 11]);
+        apply_grants(&mut settings, &[true; 11]).unwrap();
+        apply_grants(&mut settings, &[true; 11]).unwrap();
 
         let allow = settings["permissions"]["allow"].as_array().unwrap();
         assert_eq!(allow.len(), 11);
+    }
+
+    #[test]
+    fn apply_grants_rejects_non_object_settings() {
+        let mut settings = json!("not an object");
+        let result = apply_grants(&mut settings, &[true; 11]);
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("not a JSON object")
+        );
+    }
+
+    #[test]
+    fn apply_grants_rejects_non_object_permissions() {
+        let mut settings = json!({"permissions": "not an object"});
+        let result = apply_grants(&mut settings, &[true; 11]);
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("not a JSON object")
+        );
+    }
+
+    #[test]
+    fn apply_grants_rejects_non_array_allow() {
+        let mut settings = json!({"permissions": {"allow": "not an array"}});
+        let result = apply_grants(&mut settings, &[true; 11]);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("not a JSON array"));
+    }
+
+    #[test]
+    fn round_trip_grant_all_then_verify() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+
+        grant_all(&path).unwrap();
+        let grants = current_grants(&path).unwrap();
+        assert!(grants.iter().all(|&g| g), "All grants should be true");
+
+        revoke_all(&path).unwrap();
+        let grants = current_grants(&path).unwrap();
+        assert!(grants.iter().all(|&g| !g), "All grants should be false");
+    }
+
+    #[test]
+    fn current_grants_missing_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("nonexistent.json");
+
+        let grants = current_grants(&path).unwrap();
+        assert!(
+            grants.iter().all(|&g| !g),
+            "Missing file should yield all false"
+        );
+    }
+
+    #[test]
+    fn set_grants_preserves_non_ctxhelpr_entries() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+
+        // Write settings with non-ctxhelpr permissions
+        let initial = json!({
+            "permissions": {
+                "allow": ["other_tool_permission"],
+                "deny": ["something_else"]
+            },
+            "unrelated_key": 42
+        });
+        write_settings(&path, &initial).unwrap();
+
+        set_grants(&path, &[true; 11]).unwrap();
+
+        let settings = read_settings(&path).unwrap();
+        let allow = settings["permissions"]["allow"].as_array().unwrap();
+        assert!(allow.contains(&json!("other_tool_permission")));
+        assert_eq!(settings["permissions"]["deny"][0], "something_else");
+        assert_eq!(settings["unrelated_key"], 42);
+        assert_eq!(allow.len(), 12); // 1 existing + 11 ctxhelpr
     }
 }

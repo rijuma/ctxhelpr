@@ -215,7 +215,7 @@ fn test_search_symbols() {
     let (storage, path_str) = index_fixtures();
 
     let results = storage
-        .search_symbols(&path_str, "Server")
+        .search_symbols(&path_str, "Server", 20)
         .expect("search_symbols failed");
 
     assert!(!results.is_empty(), "Should find results for 'Server'");
@@ -395,6 +395,27 @@ fn test_file_symbols_compact_output() {
 fn test_update_files() {
     let (storage, path_str) = index_fixtures();
 
+    // File hasn't changed since indexing — should be skipped
+    let stats = Indexer::new()
+        .update_files(
+            &path_str,
+            &["simple.ts".to_string()],
+            &storage,
+            &[],
+            u64::MAX,
+        )
+        .expect("update_files failed");
+
+    assert_eq!(stats.files_changed, 0, "Unchanged file should be skipped");
+}
+
+#[test]
+fn test_update_files_new_file() {
+    // Fresh storage — file has never been indexed
+    let storage = SqliteStorage::open_memory().expect("Failed to create in-memory DB");
+    let path = fixtures_path();
+    let path_str = path.to_str().unwrap().to_string();
+
     let stats = Indexer::new()
         .update_files(
             &path_str,
@@ -480,7 +501,7 @@ fn test_search_no_results() {
     let (storage, path_str) = index_fixtures();
 
     let results = storage
-        .search_symbols(&path_str, "zzz_nonexistent_symbol_xyz")
+        .search_symbols(&path_str, "zzz_nonexistent_symbol_xyz", 20)
         .expect("search should not error on no results");
 
     assert!(
@@ -931,7 +952,7 @@ fn test_search_camel_case_subword() {
 
     // "getUserById" should be found when searching for "user"
     let results = storage
-        .search_symbols(&path_str, "user")
+        .search_symbols(&path_str, "user", 20)
         .expect("search failed");
     let names: Vec<&str> = results.iter().map(|r| r.name.as_str()).collect();
     assert!(
@@ -949,7 +970,7 @@ fn test_search_finds_pascal_case_class() {
 
     // Searching for "repository" should find "UserRepository" and "AdminUserRepository"
     let results = storage
-        .search_symbols(&path_str, "repository")
+        .search_symbols(&path_str, "repository", 20)
         .expect("search failed");
     let names: Vec<&str> = results.iter().map(|r| r.name.as_str()).collect();
     assert!(
@@ -965,7 +986,7 @@ fn test_search_finds_snake_case_parts() {
 
     // Searching for "retries" should find "MAX_RETRIES"
     let results = storage
-        .search_symbols(&path_str, "retries")
+        .search_symbols(&path_str, "retries", 20)
         .expect("search failed");
     let names: Vec<&str> = results.iter().map(|r| r.name.as_str()).collect();
     assert!(
@@ -981,7 +1002,7 @@ fn test_search_prefix_on_subwords() {
 
     // Prefix search "repo*" should find UserRepository via name_tokens
     let results = storage
-        .search_symbols(&path_str, "repo*")
+        .search_symbols(&path_str, "repo*", 20)
         .expect("search failed");
     let names: Vec<&str> = results.iter().map(|r| r.name.as_str()).collect();
     assert!(
@@ -1112,7 +1133,10 @@ fn test_custom_ignore_patterns() {
 
 #[test]
 fn test_update_files_skips_ignored() {
-    let (storage, path_str) = index_fixtures();
+    // Fresh storage so files appear new (not skipped by hash check)
+    let storage = SqliteStorage::open_memory().expect("Failed to create in-memory DB");
+    let path = fixtures_path();
+    let path_str = path.to_str().unwrap().to_string();
 
     let stats = Indexer::new()
         .update_files(
@@ -1567,5 +1591,65 @@ fn test_dotted_name_resolves_this_only() {
     assert!(
         !resolved_deps.is_empty(),
         "'this.findAll' should resolve to findAll symbol"
+    );
+}
+
+#[test]
+fn test_gitignore_respected() {
+    use std::fs;
+    use std::process::Command;
+
+    let tmp = tempfile::tempdir().expect("Failed to create temp dir");
+    let root = tmp.path();
+
+    // Initialize a git repo so the ignore crate recognizes .gitignore
+    Command::new("git")
+        .args(["init"])
+        .current_dir(root)
+        .output()
+        .expect("git init failed");
+
+    // Create a .gitignore that excludes "generated/"
+    fs::write(root.join(".gitignore"), "generated/\n").unwrap();
+
+    // Create a tracked file
+    fs::create_dir_all(root.join("src")).unwrap();
+    fs::write(
+        root.join("src/main.ts"),
+        "export function hello(): string { return 'hi'; }\n",
+    )
+    .unwrap();
+
+    // Create a gitignored file
+    fs::create_dir_all(root.join("generated")).unwrap();
+    fs::write(
+        root.join("generated/output.ts"),
+        "export function generated(): void {}\n",
+    )
+    .unwrap();
+
+    let storage = SqliteStorage::open_memory().expect("Failed to create in-memory DB");
+    let indexer = Indexer::new();
+    let path_str = root.to_str().unwrap();
+
+    let stats = indexer
+        .index(path_str, &storage, &[], u64::MAX)
+        .expect("Indexing failed");
+
+    // Should only index the tracked file, not the gitignored one
+    assert_eq!(
+        stats.files_total, 1,
+        "Should only index 1 file (not the gitignored one)"
+    );
+
+    // Verify the tracked symbol exists
+    let results = storage.search_symbols(path_str, "hello", 20).unwrap();
+    assert!(!results.is_empty(), "Should find 'hello' from tracked file");
+
+    // Verify the gitignored symbol does NOT exist
+    let results = storage.search_symbols(path_str, "generated", 20).unwrap();
+    assert!(
+        results.is_empty(),
+        "Should NOT find 'generated' from gitignored file"
     );
 }

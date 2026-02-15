@@ -2,11 +2,11 @@ use anyhow::Result;
 use std::fs;
 use std::process::Command;
 
-use super::{Scope, claude_dir, permissions, project_claude_dir};
+use super::{Scope, permissions, style};
 use crate::storage::db_path_for_repo;
 
 const SKILL_CONTENT: &str = include_str!("../assets/skill.md");
-const INDEX_COMMAND_CONTENT: &str = include_str!("../assets/index_command.md");
+const REINDEX_COMMAND_CONTENT: &str = include_str!("../assets/reindex_command.md");
 
 fn binary_path() -> Result<String> {
     std::env::current_exe()?
@@ -36,22 +36,23 @@ pub fn run(scope: Scope) -> Result<()> {
         other => other,
     };
 
-    let (base_dir, scope_label) = match &scope {
-        Scope::Local => (project_claude_dir()?, "local"),
-        Scope::Global => (claude_dir()?, "global"),
-        Scope::Unspecified => unreachable!(),
-    };
+    let (base_dir, scope_label) = super::resolve_scope(scope)?;
 
-    let mcp_scope = match &scope {
-        Scope::Local => "project",
-        Scope::Global => "user",
-        Scope::Unspecified => unreachable!(),
+    let mcp_scope = match scope_label {
+        "local" => "project",
+        _ => "user",
     };
 
     let cwd = std::env::current_dir()?;
     match &scope {
-        Scope::Global => println!("Enabling ctxhelpr globally...\n"),
-        _ => println!("Enabling ctxhelpr locally for {}...\n", cwd.display()),
+        Scope::Global => println!("{}\n", style::heading("Enabling ctxhelpr globally...")),
+        _ => println!(
+            "{}\n",
+            style::heading(&format!(
+                "Enabling ctxhelpr locally for {}...",
+                cwd.display()
+            ))
+        ),
     }
 
     // 1. Register MCP server
@@ -73,9 +74,12 @@ pub fn run(scope: Scope) -> Result<()> {
         .status();
 
     match status {
-        Ok(s) if s.success() => println!("done"),
+        Ok(s) if s.success() => println!("{}", style::done()),
         Ok(s) => {
-            println!("warning (exit code {})", s.code().unwrap_or(-1));
+            println!(
+                "{}",
+                style::warn(&format!("warning (exit code {})", s.code().unwrap_or(-1)))
+            );
             println!("    You may need to register manually:");
             println!(
                 "    claude mcp add --transport stdio --scope {mcp_scope} ctxhelpr -- {} serve",
@@ -83,7 +87,7 @@ pub fn run(scope: Scope) -> Result<()> {
             );
         }
         Err(e) => {
-            println!("skipped ({})", e);
+            println!("{}", style::warn(&format!("skipped ({e})")));
             println!("    Claude CLI not found. Register manually:");
             println!(
                 "    claude mcp add --transport stdio --scope {mcp_scope} ctxhelpr -- {} serve",
@@ -97,14 +101,27 @@ pub fn run(scope: Scope) -> Result<()> {
     fs::create_dir_all(&skill_dir)?;
     let skill_path = skill_dir.join("SKILL.md");
     fs::write(&skill_path, SKILL_CONTENT)?;
-    println!("  Installed skill at {}", skill_path.display());
+    println!(
+        "  Installed skill at {}",
+        style::info(&skill_path.display().to_string())
+    );
 
-    // 3. Install slash command
+    // 3. Install slash command (reindex, replacing old index)
     let commands_dir = base_dir.join("commands");
     fs::create_dir_all(&commands_dir)?;
-    let cmd_path = commands_dir.join("index.md");
-    fs::write(&cmd_path, INDEX_COMMAND_CONTENT)?;
-    println!("  Installed /index command at {}", cmd_path.display());
+
+    // Clean up old /index command if present
+    let old_cmd_path = commands_dir.join("index.md");
+    if old_cmd_path.exists() {
+        let _ = fs::remove_file(&old_cmd_path);
+    }
+
+    let cmd_path = commands_dir.join("reindex.md");
+    fs::write(&cmd_path, REINDEX_COMMAND_CONTENT)?;
+    println!(
+        "  Installed /reindex command at {}",
+        style::info(&cmd_path.display().to_string())
+    );
 
     // 4. Permission prompt
     let settings_path = base_dir.join("settings.json");
@@ -116,7 +133,10 @@ pub fn run(scope: Scope) -> Result<()> {
 
     if grant {
         permissions::grant_all(&settings_path)?;
-        println!("  Granted all tool permissions ({scope_label})");
+        println!(
+            "  {}",
+            style::success(&format!("Granted all tool permissions ({scope_label})"))
+        );
     } else {
         println!("  Skipped permissions. Run `ctxhelpr perms` to configure later.");
     }
@@ -126,10 +146,16 @@ pub fn run(scope: Scope) -> Result<()> {
         .to_str()
         .ok_or_else(|| anyhow::anyhow!("Current directory is not valid UTF-8"))?;
     let db_path = db_path_for_repo(abs_path);
-    println!("\n  Index database: {}", db_path.display());
+    println!(
+        "\n  Index database: {}",
+        style::info(&db_path.display().to_string())
+    );
 
-    println!("\nEnable complete! Restart Claude Code to start using ctxhelpr.");
-    println!("Try: /index  or ask Claude to \"index this repository\"");
+    println!(
+        "\n{}",
+        style::success("Enable complete! Restart Claude Code to start using ctxhelpr.")
+    );
+    println!("Repos are auto-indexed on startup. Use /reindex to force a refresh.");
 
     Ok(())
 }

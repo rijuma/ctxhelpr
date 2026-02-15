@@ -3,22 +3,27 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
+use super::style;
+
 const REPO: &str = "rijuma/ctxhelpr";
 const SKILL_CONTENT: &str = include_str!("../assets/skill.md");
-const INDEX_COMMAND_CONTENT: &str = include_str!("../assets/index_command.md");
+const REINDEX_COMMAND_CONTENT: &str = include_str!("../assets/reindex_command.md");
 
 pub fn run() -> Result<()> {
     let current_version = env!("CARGO_PKG_VERSION");
     let platform = detect_platform()?;
 
-    println!("ctxhelpr v{current_version} ({platform})\n");
+    println!(
+        "{}\n",
+        style::heading(&format!("ctxhelpr v{current_version} ({platform})"))
+    );
 
     print!("  Checking for updates... ");
     let latest_version = fetch_latest_version()?;
     println!("v{latest_version}");
 
     if current_version == latest_version {
-        println!("\n  Already up to date!");
+        println!("\n  {}", style::success("Already up to date!"));
         refresh_skill_files();
         return Ok(());
     }
@@ -35,14 +40,14 @@ pub fn run() -> Result<()> {
     print!("  Downloading {asset}... ");
     let tarball_path = tmpdir.join(&asset);
     download_file(&format!("{base_url}/{asset}"), &tarball_path)?;
-    println!("done");
+    println!("{}", style::done());
 
     // Verify checksum
     let checksum_path = tmpdir.join(format!("{asset}.sha256"));
     if download_file(&format!("{base_url}/{asset}.sha256"), &checksum_path).is_ok() {
         print!("  Verifying checksum... ");
         verify_checksum(&tarball_path, &checksum_path)?;
-        println!("done");
+        println!("{}", style::done());
     }
 
     // Extract
@@ -55,14 +60,14 @@ pub fn run() -> Result<()> {
     if !status.success() {
         bail!("tar extraction failed");
     }
-    println!("done");
+    println!("{}", style::done());
 
     // Replace binary
     print!("  Replacing binary... ");
     let current_exe = std::env::current_exe().context("cannot determine current binary path")?;
     let new_binary = tmpdir.join("ctxhelpr");
     replace_binary(&new_binary, &current_exe)?;
-    println!("done");
+    println!("{}", style::done());
 
     // Cleanup
     let _ = fs::remove_dir_all(&tmpdir);
@@ -70,7 +75,10 @@ pub fn run() -> Result<()> {
     // Refresh skill files
     refresh_skill_files();
 
-    println!("\n  Updated to v{latest_version}!");
+    println!(
+        "\n  {}",
+        style::success(&format!("Updated to v{latest_version}!"))
+    );
     println!(
         "\n  Consider re-indexing your repositories to take advantage of any indexing improvements."
     );
@@ -245,19 +253,37 @@ fn refresh_skill_files() {
         let skill_path = base.join("skills").join("ctxhelpr").join("SKILL.md");
         if skill_path.exists() {
             if let Err(e) = fs::write(&skill_path, SKILL_CONTENT) {
-                eprintln!("  Warning: could not refresh skill file: {e}");
+                eprintln!(
+                    "  {}",
+                    style::warn(&format!("Warning: could not refresh skill file: {e}"))
+                );
             } else {
                 refreshed = true;
             }
         }
 
-        let cmd_path = base.join("commands").join("index.md");
-        if cmd_path.exists() {
-            if let Err(e) = fs::write(&cmd_path, INDEX_COMMAND_CONTENT) {
-                eprintln!("  Warning: could not refresh command file: {e}");
+        // Refresh reindex.md command
+        let reindex_path = base.join("commands").join("reindex.md");
+        if reindex_path.exists() {
+            if let Err(e) = fs::write(&reindex_path, REINDEX_COMMAND_CONTENT) {
+                eprintln!(
+                    "  {}",
+                    style::warn(&format!("Warning: could not refresh command file: {e}"))
+                );
             } else {
                 refreshed = true;
             }
+        }
+
+        // Clean up old /index command if present
+        let old_cmd_path = base.join("commands").join("index.md");
+        if old_cmd_path.exists() {
+            let _ = fs::remove_file(&old_cmd_path);
+            // Install reindex.md in its place
+            if !reindex_path.exists() {
+                let _ = fs::write(&reindex_path, REINDEX_COMMAND_CONTENT);
+            }
+            refreshed = true;
         }
     }
 

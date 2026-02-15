@@ -2,6 +2,7 @@ use anyhow::Result;
 use clap::Subcommand;
 use dialoguer::{Confirm, MultiSelect};
 
+use super::style;
 use crate::storage;
 
 #[derive(Subcommand)]
@@ -35,7 +36,7 @@ fn list() -> Result<()> {
         return Ok(());
     }
 
-    println!("Indexed repositories:\n");
+    println!("{}\n", style::heading("Indexed repositories:"));
     let mut total_size: u64 = 0;
     for repo in &repos {
         println!("  {}", repo.abs_path);
@@ -104,14 +105,17 @@ fn delete_interactive() -> Result<()> {
         .default(true)
         .interact()?
     {
-        println!("Cancelled.");
+        println!("{}", style::warn("Cancelled."));
         return Ok(());
     }
 
     for path in &selected_paths {
         match storage::delete_repo_index(path) {
-            Ok(()) => println!("  Deleted: {path}"),
-            Err(e) => println!("  Failed to delete {path}: {e}"),
+            Ok(()) => println!("  {}", style::success(&format!("Deleted: {path}"))),
+            Err(e) => println!(
+                "  {}",
+                style::error(&format!("Failed to delete {path}: {e}"))
+            ),
         }
     }
     Ok(())
@@ -128,14 +132,17 @@ fn delete_paths(paths: &[String]) -> Result<()> {
         .default(true)
         .interact()?
     {
-        println!("Cancelled.");
+        println!("{}", style::warn("Cancelled."));
         return Ok(());
     }
 
     for path in paths {
         match storage::delete_repo_index(path) {
-            Ok(()) => println!("  Deleted: {path}"),
-            Err(e) => println!("  Failed to delete {path}: {e}"),
+            Ok(()) => println!("  {}", style::success(&format!("Deleted: {path}"))),
+            Err(e) => println!(
+                "  {}",
+                style::error(&format!("Failed to delete {path}: {e}"))
+            ),
         }
     }
     Ok(())
