@@ -14,8 +14,19 @@ use cli::Scope;
 use cli::config_cmd::ConfigArgs;
 use cli::repos::ReposCommands;
 
+fn version_string() -> &'static str {
+    concat!(
+        env!("CARGO_PKG_VERSION"),
+        " (",
+        env!("CTXHELPR_BUILD_TARGET"),
+        ", built ",
+        env!("CTXHELPR_BUILD_DATE"),
+        ")"
+    )
+}
+
 #[derive(Parser)]
-#[command(name = "ctxhelpr", about = "Semantic code indexing for Claude Code")]
+#[command(name = "ctxhelpr", about = "Semantic code indexing for Claude Code", version = version_string())]
 struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,

@@ -9,7 +9,7 @@ Este documento explica cómo ctxhelpr indexa codebases, las decisiones de diseñ
 
 ctxhelpr usa **tree-sitter** para parsear archivos fuente en árboles de sintaxis concretos (CSTs), luego extrae símbolos estructurales (funciones, clases, interfaces, etc.) y sus relaciones (llamadas, imports, referencias de tipos). Estos se almacenan en **SQLite** con búsqueda full-text **FTS5** y se sirven a agentes de IA vía herramientas MCP.
 
-La idea clave: los agentes de IA no necesitan leer archivos fuente crudos para navegar código. Necesitan resúmenes estructurados y eficientes en tokens en los que pueden profundizar bajo demanda.
+La premisa de diseño: los agentes de IA no necesitan leer archivos fuente crudos para navegar código — resúmenes estructurados y eficientes en tokens en los que pueden profundizar bajo demanda deberían ser suficientes.
 
 ## Flujo de Datos
 
@@ -220,7 +220,7 @@ Esto significa que FTS siempre está consistente con la tabla de símbolos sin r
 ## Ventajas
 
 1. **Actualizaciones incrementales rápidas** - Solo los archivos modificados se re-parsean. La detección de cambios basada en hash es confiable y rápida.
-2. **Salida eficiente en tokens** - Claves compactas, deduplicación de rutas y truncamiento reducen el consumo de contexto de IA entre 30-60% comparado con salida cruda.
+2. **Salida eficiente en tokens** - Claves compactas, deduplicación de rutas y truncamiento pueden reducir el consumo de contexto de IA en un estimado de 30-60% comparado con salida cruda.
 3. **Búsqueda inteligente de código** - Los identificadores pre-tokenizados hacen que las búsquedas de sub-strings funcionen a través de convenciones de nombres.
 4. **Núcleo agnóstico de lenguaje** - Agregar un nuevo lenguaje requiere solo implementar `LanguageExtractor`. El almacenamiento, salida y búsqueda funcionan sin cambios.
 5. **Sin dependencias externas** - SQLite viene integrado (vía `rusqlite`), las gramáticas de tree-sitter se compilan dentro. Binario único sin dependencias en tiempo de ejecución.

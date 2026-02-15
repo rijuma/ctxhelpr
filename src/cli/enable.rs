@@ -16,7 +16,7 @@ fn binary_path() -> Result<String> {
 }
 
 fn prompt_scope() -> Result<Scope> {
-    let options = &["Local (this project)", "Global (~/.claude/)"];
+    let options = &["Global (~/.claude/)", "Local (this project)"];
     let selection = dialoguer::Select::new()
         .with_prompt("Where do you want to enable ctxhelpr?")
         .items(options)
@@ -25,8 +25,8 @@ fn prompt_scope() -> Result<Scope> {
         .map_err(|_| anyhow::anyhow!("Enable cancelled."))?;
 
     match selection {
-        0 => Ok(Scope::Local),
-        _ => Ok(Scope::Global),
+        0 => Ok(Scope::Global),
+        _ => Ok(Scope::Local),
     }
 }
 

@@ -87,8 +87,8 @@ src/
 ### Stack tecnológico
 
 - **Rust** (edition 2024) - porque el tiempo de inicio y la memoria importan para una herramienta que corre al lado de tu editor
-- **tree-sitter** - parsing rápido y confiable entre lenguajes
-- **SQLite + FTS5** - base de datos en un solo archivo con búsqueda full-text, sin dependencias externas
+- **tree-sitter** - parsing incremental con gramáticas por lenguaje
+- **SQLite + FTS5** - base de datos embebida con búsqueda full-text, sin dependencias externas
 - **rmcp** - SDK oficial de Rust para el Model Context Protocol
 - **tokio** - runtime async para el servidor MCP
 

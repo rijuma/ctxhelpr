@@ -87,8 +87,8 @@ The `lib.rs` re-exports `indexer`, `output`, and `storage` for use in integratio
 ### Tech stack
 
 - **Rust** (edition 2024) - because startup time and memory matter for a tool that runs alongside your editor
-- **tree-sitter** - fast, reliable parsing across languages
-- **SQLite + FTS5** - single-file database with full-text search, no external dependencies
+- **tree-sitter** - incremental parsing with per-language grammars
+- **SQLite + FTS5** - embedded database with full-text search, no external dependencies
 - **rmcp** - official Rust SDK for the Model Context Protocol
 - **tokio** - async runtime for the MCP server
 
