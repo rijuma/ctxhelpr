@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.2 - 2026-02-15
+- Added privacy disclaimer
+- Refined Typescript indexing strategy (#30)
+
 ## 0.1.1 - 2026-02-15
 - Fixed install script
 - Updated CF script
