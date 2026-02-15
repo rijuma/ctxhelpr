@@ -24,6 +24,11 @@ impl LanguageExtractor for TypeScriptExtractor {
 
 fn extract_from_node(node: Node, source: &[u8], symbols: &mut Vec<ExtractedSymbol>) {
     let mut cursor = node.walk();
+    let mut import_refs = Vec::new();
+    let mut test_refs = Vec::new();
+    let mut file_start = usize::MAX;
+    let mut file_end = 0usize;
+
     for child in node.children(&mut cursor) {
         match child.kind() {
             "function_declaration" | "generator_function_declaration" => {
@@ -55,13 +60,241 @@ fn extract_from_node(node: Node, source: &[u8], symbols: &mut Vec<ExtractedSymbo
                 extract_variable_declarations(child, source, symbols);
             }
             "export_statement" => {
-                // Recurse into export to find the actual declaration
-                extract_from_node(child, source, symbols);
+                extract_export_statement(child, source, symbols);
             }
             "import_statement" => {
-                // We track imports as references, not symbols
+                let refs = extract_import_refs(child, source);
+                if !refs.is_empty() {
+                    let line = child.start_position().row + 1;
+                    if line < file_start {
+                        file_start = line;
+                    }
+                    let end = child.end_position().row + 1;
+                    if end > file_end {
+                        file_end = end;
+                    }
+                    import_refs.extend(refs);
+                }
+            }
+            "ambient_declaration" => {
+                // `declare module "name" { ... }` — recurse into body
+                extract_ambient_declaration(child, source, symbols);
+            }
+            "expression_statement" => {
+                // Top-level expressions like `describe(...)`, `test(...)`
+                collect_callback_refs(child, source, &mut test_refs);
             }
             _ => {}
+        }
+    }
+
+    // Create single _imports symbol if any import refs were collected
+    if !import_refs.is_empty() {
+        symbols.push(ExtractedSymbol {
+            name: "_imports".to_string(),
+            kind: SymbolKind::Mod,
+            signature: None,
+            doc_comment: None,
+            start_line: file_start,
+            end_line: file_end,
+            children: Vec::new(),
+            references: import_refs,
+        });
+    }
+
+    // Create single _tests symbol if any test refs were collected
+    if !test_refs.is_empty() {
+        // Deduplicate refs by (name, kind)
+        let mut seen = std::collections::HashSet::new();
+        test_refs.retain(|r| seen.insert((r.name.clone(), r.kind.as_str().to_string())));
+
+        symbols.push(ExtractedSymbol {
+            name: "_tests".to_string(),
+            kind: SymbolKind::Fn,
+            signature: None,
+            doc_comment: None,
+            start_line: 1,
+            end_line: node.end_position().row + 1,
+            children: Vec::new(),
+            references: test_refs,
+        });
+    }
+}
+
+/// Handle export statements, including:
+/// - `export function/class/...` (recurse to find declaration)
+/// - `export default <expression>` (synthetic symbol)
+/// - `export { X, Y } from './mod'` (barrel re-exports)
+/// - `export * from './mod'`
+fn extract_export_statement(node: Node, source: &[u8], symbols: &mut Vec<ExtractedSymbol>) {
+    let mut has_known_child = false;
+    let mut cursor = node.walk();
+
+    for child in node.children(&mut cursor) {
+        match child.kind() {
+            // Standard declarations — recurse as before
+            "function_declaration"
+            | "generator_function_declaration"
+            | "class_declaration"
+            | "interface_declaration"
+            | "type_alias_declaration"
+            | "enum_declaration"
+            | "lexical_declaration"
+            | "variable_declaration" => {
+                extract_from_node(node, source, symbols);
+                return;
+            }
+            // Named re-exports: `export { X, Y } from './mod'`
+            "export_clause" => {
+                has_known_child = true;
+                extract_export_clause(child, node, source, symbols);
+            }
+            // Namespace re-export: `export * from './mod'`
+            "*" => {
+                has_known_child = true;
+                // Find the source module
+                let mut c2 = node.walk();
+                for sibling in node.children(&mut c2) {
+                    if sibling.kind() == "string" || sibling.kind() == "string_fragment" {
+                        let module = text(sibling, source)
+                            .trim_matches('"')
+                            .trim_matches('\'')
+                            .to_string();
+                        symbols.push(ExtractedSymbol {
+                            name: format!("* from {}", module),
+                            kind: SymbolKind::Mod,
+                            signature: None,
+                            doc_comment: None,
+                            start_line: node.start_position().row + 1,
+                            end_line: node.end_position().row + 1,
+                            children: Vec::new(),
+                            references: Vec::new(),
+                        });
+                        break;
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    // If no standard declaration was found, handle `export default <expression>`
+    if !has_known_child {
+        if let Some(sym) = extract_default_export(node, source) {
+            symbols.push(sym);
+        }
+    }
+}
+
+/// Extract named re-exports: `export { X, Y } from './mod'` or `export { X as Z }`
+fn extract_export_clause(
+    clause: Node,
+    export_node: Node,
+    source: &[u8],
+    symbols: &mut Vec<ExtractedSymbol>,
+) {
+    // Determine if there's a source module
+    let source_module = find_string_child(export_node, source);
+
+    let mut cursor = clause.walk();
+    for child in clause.children(&mut cursor) {
+        if child.kind() == "export_specifier" {
+            let name_node = child
+                .child_by_field_name("name")
+                .or_else(|| child.named_child(0));
+            let alias_node = child.child_by_field_name("alias");
+
+            if let Some(name_n) = name_node {
+                let original_name = text(name_n, source);
+                let exported_name = alias_node
+                    .map(|a| text(a, source))
+                    .unwrap_or_else(|| original_name.clone());
+
+                let mut refs = Vec::new();
+                if source_module.is_some() {
+                    refs.push(ExtractedRef {
+                        name: original_name,
+                        kind: RefKind::Import,
+                        line: child.start_position().row + 1,
+                    });
+                }
+
+                symbols.push(ExtractedSymbol {
+                    name: exported_name,
+                    kind: SymbolKind::Var,
+                    signature: None,
+                    doc_comment: None,
+                    start_line: child.start_position().row + 1,
+                    end_line: child.end_position().row + 1,
+                    children: Vec::new(),
+                    references: refs,
+                });
+            }
+        }
+    }
+}
+
+/// Handle `export default <expression>` — create a synthetic "default" symbol
+/// and recurse into the expression for refs
+fn extract_default_export(node: Node, source: &[u8]) -> Option<ExtractedSymbol> {
+    let mut cursor = node.walk();
+    let mut default_expr = None;
+
+    for child in node.children(&mut cursor) {
+        match child.kind() {
+            // Skip keywords
+            "export" | "default" | ";" => {}
+            _ => {
+                default_expr = Some(child);
+                break;
+            }
+        }
+    }
+
+    let expr = default_expr?;
+
+    let mut refs = Vec::new();
+    extract_calls(expr, source, &mut refs);
+
+    // Also recurse into arrow functions / function expressions inside calls
+    // e.g., `export default fp(async (fastify) => { ... })`
+    extract_nested_callback_refs(expr, source, &mut refs);
+
+    Some(ExtractedSymbol {
+        name: "default".to_string(),
+        kind: SymbolKind::Fn,
+        signature: None,
+        doc_comment: get_doc_comment(node, source),
+        start_line: node.start_position().row + 1,
+        end_line: node.end_position().row + 1,
+        children: Vec::new(),
+        references: refs,
+    })
+}
+
+/// Walk into callback arguments of call expressions to find deeper refs.
+/// This handles patterns like `fp(async (fastify) => { body })`.
+fn extract_nested_callback_refs(node: Node, source: &[u8], refs: &mut Vec<ExtractedRef>) {
+    if node.kind() == "call_expression" {
+        if let Some(args) = node.child_by_field_name("arguments") {
+            let mut cursor = args.walk();
+            for arg in args.children(&mut cursor) {
+                if arg.kind() == "arrow_function"
+                    || arg.kind() == "function_expression"
+                    || arg.kind() == "function"
+                {
+                    if let Some(body) = arg.child_by_field_name("body") {
+                        extract_calls(body, source, refs);
+                    }
+                }
+            }
+        }
+    }
+    // Recurse into children looking for nested call expressions
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        if child.kind() != "call_expression" {
+            extract_nested_callback_refs(child, source, refs);
         }
     }
 }
@@ -403,31 +636,49 @@ fn extract_calls(node: Node, source: &[u8], refs: &mut Vec<ExtractedRef>) {
 fn extract_calls_recursive(cursor: &mut TreeCursor, source: &[u8], refs: &mut Vec<ExtractedRef>) {
     loop {
         let node = cursor.node();
-        if node.kind() == "call_expression" {
-            if let Some(func) = node.child_by_field_name("function") {
-                let name = match func.kind() {
-                    "identifier" => text(func, source),
-                    "member_expression" => {
-                        let prop = func
-                            .child_by_field_name("property")
-                            .map(|n| text(n, source));
-                        let obj = func.child_by_field_name("object").map(|n| text(n, source));
-                        match (obj, prop) {
-                            (Some(o), Some(p)) => format!("{}.{}", o, p),
-                            (None, Some(p)) => p,
-                            _ => text(func, source),
-                        }
+        match node.kind() {
+            "call_expression" => {
+                if let Some(func) = node.child_by_field_name("function") {
+                    let name = extract_callable_name(func, source);
+                    if !name.is_empty() {
+                        refs.push(ExtractedRef {
+                            name,
+                            kind: RefKind::Call,
+                            line: node.start_position().row + 1,
+                        });
                     }
-                    _ => text(func, source),
-                };
-                if !name.is_empty() {
-                    refs.push(ExtractedRef {
-                        name,
-                        kind: RefKind::Call,
-                        line: node.start_position().row + 1,
-                    });
                 }
             }
+            "new_expression" => {
+                if let Some(constructor) = node.child_by_field_name("constructor") {
+                    let name = extract_callable_name(constructor, source);
+                    if !name.is_empty() {
+                        refs.push(ExtractedRef {
+                            name,
+                            kind: RefKind::Call,
+                            line: node.start_position().row + 1,
+                        });
+                    }
+                }
+            }
+            "binary_expression" => {
+                // Capture `x instanceof Y`
+                if let Some(op) = node.child_by_field_name("operator") {
+                    if text(op, source) == "instanceof" {
+                        if let Some(right) = node.child_by_field_name("right") {
+                            let name = text(right, source);
+                            if !name.is_empty() {
+                                refs.push(ExtractedRef {
+                                    name,
+                                    kind: RefKind::TypeRef,
+                                    line: node.start_position().row + 1,
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+            _ => {}
         }
 
         if cursor.goto_first_child() {
@@ -439,4 +690,248 @@ fn extract_calls_recursive(cursor: &mut TreeCursor, source: &[u8], refs: &mut Ve
             break;
         }
     }
+}
+
+fn extract_callable_name(func: Node, source: &[u8]) -> String {
+    match func.kind() {
+        "identifier" => text(func, source),
+        "member_expression" => {
+            let prop = func
+                .child_by_field_name("property")
+                .map(|n| text(n, source));
+            let obj = func.child_by_field_name("object").map(|n| text(n, source));
+            match (obj, prop) {
+                (Some(o), Some(p)) => format!("{}.{}", o, p),
+                (None, Some(p)) => p,
+                _ => text(func, source),
+            }
+        }
+        _ => text(func, source),
+    }
+}
+
+/// Extract import references from an import statement.
+/// Returns refs without wrapping in a symbol — caller accumulates into a single `_imports` symbol.
+fn extract_import_refs(node: Node, source: &[u8]) -> Vec<ExtractedRef> {
+    let mut refs = Vec::new();
+    let mut cursor = node.walk();
+
+    for child in node.children(&mut cursor) {
+        match child.kind() {
+            "import_clause" => {
+                extract_import_clause_refs(child, source, &mut refs, node.start_position().row + 1);
+            }
+            // `import X from "mod"` — default import (identifier directly in import)
+            "identifier" => {
+                refs.push(ExtractedRef {
+                    name: text(child, source),
+                    kind: RefKind::Import,
+                    line: child.start_position().row + 1,
+                });
+            }
+            _ => {}
+        }
+    }
+
+    refs
+}
+
+fn extract_import_clause_refs(
+    clause: Node,
+    source: &[u8],
+    refs: &mut Vec<ExtractedRef>,
+    line: usize,
+) {
+    let mut cursor = clause.walk();
+    for child in clause.children(&mut cursor) {
+        match child.kind() {
+            "identifier" => {
+                refs.push(ExtractedRef {
+                    name: text(child, source),
+                    kind: RefKind::Import,
+                    line,
+                });
+            }
+            "named_imports" => {
+                let mut ic = child.walk();
+                for spec in child.children(&mut ic) {
+                    if spec.kind() == "import_specifier" {
+                        // Use alias if present, otherwise use name
+                        let imported = spec
+                            .child_by_field_name("name")
+                            .or_else(|| spec.named_child(0));
+                        if let Some(name_n) = imported {
+                            refs.push(ExtractedRef {
+                                name: text(name_n, source),
+                                kind: RefKind::Import,
+                                line: spec.start_position().row + 1,
+                            });
+                        }
+                    }
+                }
+            }
+            "namespace_import" => {
+                // `import * as X from "mod"` — the identifier is the alias
+                if let Some(id) = child.named_child(0) {
+                    refs.push(ExtractedRef {
+                        name: text(id, source),
+                        kind: RefKind::Import,
+                        line,
+                    });
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Handle `declare module "name" { ... }` augmentations
+fn extract_ambient_declaration(node: Node, source: &[u8], symbols: &mut Vec<ExtractedSymbol>) {
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        if child.kind() == "module" {
+            let name = child
+                .child_by_field_name("name")
+                .map(|n| {
+                    text(n, source)
+                        .trim_matches('"')
+                        .trim_matches('\'')
+                        .to_string()
+                })
+                .unwrap_or_else(|| "unknown".to_string());
+
+            let mut children = Vec::new();
+            if let Some(body) = child.child_by_field_name("body") {
+                extract_from_node(body, source, &mut children);
+            }
+
+            symbols.push(ExtractedSymbol {
+                name,
+                kind: SymbolKind::Mod,
+                signature: None,
+                doc_comment: None,
+                start_line: node.start_position().row + 1,
+                end_line: node.end_position().row + 1,
+                children,
+                references: Vec::new(),
+            });
+            return;
+        }
+        // Also handle `declare function`, `declare class`, etc.
+        match child.kind() {
+            "function_declaration" | "function_signature" => {
+                if let Some(sym) = extract_function(child, source) {
+                    symbols.push(sym);
+                }
+            }
+            "class_declaration" => {
+                if let Some(sym) = extract_class(child, source) {
+                    symbols.push(sym);
+                }
+            }
+            "interface_declaration" => {
+                if let Some(sym) = extract_interface(child, source) {
+                    symbols.push(sym);
+                }
+            }
+            "type_alias_declaration" => {
+                if let Some(sym) = extract_type_alias(child, source) {
+                    symbols.push(sym);
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Well-known test/callback wrapper names at top level.
+const CALLBACK_WRAPPERS: &[&str] = &[
+    "describe",
+    "test",
+    "it",
+    "fp",
+    "beforeEach",
+    "afterEach",
+    "beforeAll",
+    "afterAll",
+];
+
+/// Collect refs from well-known callback patterns (describe/test/it/fp/etc.)
+/// without creating per-block symbols. Refs are accumulated into `refs` and
+/// the caller creates a single `_tests` symbol per file.
+fn collect_callback_refs(node: Node, source: &[u8], refs: &mut Vec<ExtractedRef>) {
+    // node is an expression_statement — get the call_expression children
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        if child.kind() == "call_expression" {
+            collect_callback_refs_from_call(child, source, refs);
+        }
+    }
+}
+
+fn collect_callback_refs_from_call(node: Node, source: &[u8], refs: &mut Vec<ExtractedRef>) {
+    let func = match node.child_by_field_name("function") {
+        Some(f) => f,
+        None => return,
+    };
+
+    let func_name = match func.kind() {
+        "identifier" => text(func, source),
+        "member_expression" => func
+            .child_by_field_name("property")
+            .map(|n| text(n, source))
+            .unwrap_or_default(),
+        _ => return,
+    };
+
+    if !CALLBACK_WRAPPERS.contains(&func_name.as_str()) {
+        return;
+    }
+
+    let args = match node.child_by_field_name("arguments") {
+        Some(a) => a,
+        None => return,
+    };
+
+    // Find the callback body and extract refs from it
+    let mut ac = args.walk();
+    for arg in args.children(&mut ac) {
+        match arg.kind() {
+            "arrow_function" | "function_expression" | "function" => {
+                if let Some(body) = arg.child_by_field_name("body") {
+                    extract_calls(body, source, refs);
+
+                    // Recurse into nested describe/test/it blocks
+                    let mut bc = body.walk();
+                    for stmt in body.children(&mut bc) {
+                        if stmt.kind() == "expression_statement" {
+                            let mut sc = stmt.walk();
+                            for child in stmt.children(&mut sc) {
+                                if child.kind() == "call_expression" {
+                                    collect_callback_refs_from_call(child, source, refs);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Find the first string literal child of a node (used for `from "module"`)
+fn find_string_child(node: Node, source: &[u8]) -> Option<String> {
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        if child.kind() == "string" {
+            return Some(
+                text(child, source)
+                    .trim_matches('"')
+                    .trim_matches('\'')
+                    .to_string(),
+            );
+        }
+    }
+    None
 }

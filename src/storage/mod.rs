@@ -535,17 +535,57 @@ impl SqliteStorage {
     // ── Reference resolution ──
 
     pub fn resolve_references(&self, repo_id: i64) -> Result<usize> {
+        // Pass 1: Exact name match — prefer definitions over re-exports/aliases
         let updated = self.conn.execute(
             "UPDATE refs SET to_symbol_id = (
                 SELECT s.id FROM symbols s
                 WHERE s.name = refs.to_name AND s.repo_id = ?1
+                ORDER BY CASE WHEN s.kind IN ('class','fn','interface','type','enum','struct','trait','method') THEN 0 ELSE 1 END
                 LIMIT 1
              )
              WHERE to_symbol_id IS NULL
              AND from_symbol_id IN (SELECT id FROM symbols WHERE repo_id = ?1)",
             params![repo_id],
         )?;
-        Ok(updated)
+
+        // Pass 2: For `this.X` patterns only (single dot, `this.` prefix).
+        // These are almost always intra-class method calls with unambiguous resolution.
+        // We avoid resolving arbitrary dotted names (e.g., `response.json`) to prevent
+        // false positives with common last-segment names like get, set, map, filter.
+        let mut stmt = self.conn.prepare(
+            "SELECT id, to_name FROM refs
+             WHERE to_symbol_id IS NULL
+             AND to_name LIKE 'this.%'
+             AND INSTR(SUBSTR(to_name, 6), '.') = 0
+             AND from_symbol_id IN (SELECT id FROM symbols WHERE repo_id = ?1)",
+        )?;
+        let dotted_refs: Vec<(i64, String)> = stmt
+            .query_map(params![repo_id], |row| Ok((row.get(0)?, row.get(1)?)))?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        drop(stmt);
+
+        let mut updated2 = 0usize;
+        for (ref_id, to_name) in &dotted_refs {
+            // Extract the method name after "this."
+            let method_name = &to_name[5..];
+            let resolved: Option<i64> = self
+                .conn
+                .query_row(
+                    "SELECT id FROM symbols WHERE name = ?1 AND repo_id = ?2 LIMIT 1",
+                    params![method_name, repo_id],
+                    |row| row.get(0),
+                )
+                .ok();
+            if let Some(sym_id) = resolved {
+                self.conn.execute(
+                    "UPDATE refs SET to_symbol_id = ?1 WHERE id = ?2",
+                    params![sym_id, ref_id],
+                )?;
+                updated2 += 1;
+            }
+        }
+
+        Ok(updated + updated2)
     }
 
     // ── Query operations ──
