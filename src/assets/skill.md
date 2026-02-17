@@ -22,12 +22,16 @@ Note: ctxhelpr only indexes files tracked by git (respects .gitignore). For
 gitignored files (e.g. .env, build output, generated code), use Grep/Read instead.
 
 ### Startup workflow
-Previously-indexed repos are automatically re-indexed when the MCP server starts,
-so the index is always fresh. For new repos, call `index_repository` first.
+Previously-indexed repos are automatically re-indexed when the MCP server starts.
+New repos are auto-indexed on first tool call — no manual setup needed.
 
 1. Call `get_overview` for the big picture (modules, key types, entry points)
 2. Drill into specific areas with `get_file_symbols` or `search_symbols`
 3. Follow references with `get_symbol_detail`, `get_references`, `get_dependencies`
+
+If a repo hasn't been indexed yet, ctxhelpr will start background indexing and
+return a message with options: call `index_repository` to wait, or use
+Grep/Glob/Read as fallback tools.
 
 If the index seems off, use `/reindex` to force a full re-index.
 
