@@ -1,3 +1,5 @@
+pub mod indexing_tracker;
+
 use rmcp::handler::server::router::tool::ToolRouter;
 use rmcp::handler::server::wrapper::Parameters;
 use rmcp::model::*;
@@ -13,6 +15,8 @@ use crate::indexer::Indexer;
 use crate::output::{CompactFormatter, OutputFormatter, TokenBudget};
 use crate::storage::{self, SqliteStorage};
 use crate::watcher::WatcherHandle;
+
+use self::indexing_tracker::IndexingTracker;
 
 type McpError = rmcp::ErrorData;
 
@@ -90,6 +94,7 @@ pub struct CtxhelprServer {
     indexer: Arc<Indexer>,
     config_cache: Arc<ConfigCache>,
     watcher: WatcherHandle,
+    indexing_tracker: Arc<IndexingTracker>,
     tool_router: ToolRouter<Self>,
 }
 
@@ -109,8 +114,88 @@ impl CtxhelprServer {
             indexer,
             config_cache,
             watcher,
+            indexing_tracker: Arc::new(IndexingTracker::new()),
             tool_router: Self::tool_router(),
         }
+    }
+
+    fn auto_index_message(path: &str, status: &str) -> CallToolResult {
+        let msg = format!(
+            "Repository '{path}' is not indexed yet ({status}). \
+             Background indexing has been triggered.\n\n\
+             Options:\n\
+             1. Call `index_repository` with this path to wait for indexing to complete, then retry.\n\
+             2. Use Grep/Glob/Read as fallback tools for now and retry ctxhelpr tools later."
+        );
+        CallToolResult::error(vec![Content::text(msg)])
+    }
+
+    fn ensure_indexed(&self, path: &str) -> Option<CallToolResult> {
+        if !storage::has_index_db(path) {
+            return Some(self.trigger_background_index(path));
+        }
+        let storage = match SqliteStorage::open(path) {
+            Ok(s) => s,
+            Err(_) => return Some(self.trigger_background_index(path)),
+        };
+        if storage.is_repo_indexed(path) {
+            return None;
+        }
+        Some(self.trigger_background_index(path))
+    }
+
+    fn trigger_background_index(&self, path: &str) -> CallToolResult {
+        if self.indexing_tracker.is_indexing(path) {
+            return Self::auto_index_message(path, "currently being indexed");
+        }
+
+        let handle = match self.indexing_tracker.start_indexing(path) {
+            Some(h) => h,
+            None => return Self::auto_index_message(path, "currently being indexed"),
+        };
+
+        let indexer = self.indexer.clone();
+        let config_cache = self.config_cache.clone();
+        let watcher = self.watcher.clone();
+        let path_owned = path.to_string();
+
+        tokio::spawn(async move {
+            let idx = indexer.clone();
+            let p = path_owned.clone();
+            let config = config_cache.get(&p);
+            let ignore = config.indexer.ignore.clone();
+            let max_file_size = config.indexer.max_file_size;
+
+            let result = tokio::task::spawn_blocking(move || {
+                let storage = SqliteStorage::open(&p)?;
+                idx.index(&p, &storage, &ignore, max_file_size)
+            })
+            .await;
+
+            match result {
+                Ok(Ok(stats)) => {
+                    tracing::info!(
+                        path = %path_owned,
+                        files = stats.files_total,
+                        symbols = stats.symbols_count,
+                        duration_ms = stats.duration_ms,
+                        "Background auto-index complete"
+                    );
+                    crate::skills::refresh(&crate::skills::base_dirs_for_repo(&path_owned));
+                    watcher.watch_repo(&path_owned).await;
+                }
+                Ok(Err(e)) => {
+                    tracing::warn!(path = %path_owned, error = %e, "Background auto-index failed");
+                }
+                Err(e) => {
+                    tracing::warn!(path = %path_owned, error = %e, "Background auto-index task panicked");
+                }
+            }
+
+            handle.complete();
+        });
+
+        Self::auto_index_message(path, "indexing started")
     }
 
     #[tool(
@@ -121,6 +206,17 @@ impl CtxhelprServer {
         Parameters(params): Parameters<RepoPathParams>,
     ) -> Result<CallToolResult, McpError> {
         tracing::info!(path = %params.path, "index_repository");
+
+        // Wait for background auto-indexing to finish (if any) to avoid concurrent writes
+        if let Some(mut rx) = self.indexing_tracker.wait_for_completion(&params.path) {
+            tracing::info!(path = %params.path, "Waiting for background auto-index to complete");
+            while !*rx.borrow() {
+                if rx.changed().await.is_err() {
+                    break;
+                }
+            }
+        }
+
         let config = self.config_cache.get(&params.path);
         let indexer = self.indexer.clone();
         let path = params.path.clone();
@@ -150,6 +246,9 @@ impl CtxhelprServer {
         Parameters(params): Parameters<RepoPathParams>,
     ) -> Result<CallToolResult, McpError> {
         tracing::info!(path = %params.path, "get_overview");
+        if let Some(result) = self.ensure_indexed(&params.path) {
+            return Ok(result);
+        }
         let config = self.config_cache.get(&params.path);
         let storage = open_storage(&params.path)?;
         let fmt = formatter(&config.output);
@@ -169,6 +268,9 @@ impl CtxhelprServer {
         Parameters(params): Parameters<FileSymbolsParams>,
     ) -> Result<CallToolResult, McpError> {
         tracing::info!(path = %params.path, file = %params.file, "get_file_symbols");
+        if let Some(result) = self.ensure_indexed(&params.path) {
+            return Ok(result);
+        }
         let config = self.config_cache.get(&params.path);
         let storage = open_storage(&params.path)?;
         let fmt = formatter(&config.output);
@@ -192,6 +294,9 @@ impl CtxhelprServer {
         Parameters(params): Parameters<SymbolIdParams>,
     ) -> Result<CallToolResult, McpError> {
         tracing::info!(path = %params.path, symbol_id = params.symbol_id, "get_symbol_detail");
+        if let Some(result) = self.ensure_indexed(&params.path) {
+            return Ok(result);
+        }
         let config = self.config_cache.get(&params.path);
         let storage = open_storage(&params.path)?;
         let fmt = formatter(&config.output);
@@ -229,6 +334,9 @@ impl CtxhelprServer {
         Parameters(params): Parameters<SearchParams>,
     ) -> Result<CallToolResult, McpError> {
         tracing::info!(path = %params.path, query = %params.query, "search_symbols");
+        if let Some(result) = self.ensure_indexed(&params.path) {
+            return Ok(result);
+        }
         let config = self.config_cache.get(&params.path);
         let storage = open_storage(&params.path)?;
         let fmt = formatter(&config.output);
@@ -252,6 +360,9 @@ impl CtxhelprServer {
         Parameters(params): Parameters<SymbolIdParams>,
     ) -> Result<CallToolResult, McpError> {
         tracing::info!(path = %params.path, symbol_id = params.symbol_id, "get_references");
+        if let Some(result) = self.ensure_indexed(&params.path) {
+            return Ok(result);
+        }
         let config = self.config_cache.get(&params.path);
         let storage = open_storage(&params.path)?;
         let fmt = formatter(&config.output);
@@ -275,6 +386,9 @@ impl CtxhelprServer {
         Parameters(params): Parameters<SymbolIdParams>,
     ) -> Result<CallToolResult, McpError> {
         tracing::info!(path = %params.path, symbol_id = params.symbol_id, "get_dependencies");
+        if let Some(result) = self.ensure_indexed(&params.path) {
+            return Ok(result);
+        }
         let config = self.config_cache.get(&params.path);
         let storage = open_storage(&params.path)?;
         let fmt = formatter(&config.output);
@@ -298,6 +412,9 @@ impl CtxhelprServer {
         Parameters(params): Parameters<RepoPathParams>,
     ) -> Result<CallToolResult, McpError> {
         tracing::info!(path = %params.path, "index_status");
+        if let Some(result) = self.ensure_indexed(&params.path) {
+            return Ok(result);
+        }
         let config = self.config_cache.get(&params.path);
         let storage = open_storage(&params.path)?;
         let fmt = formatter(&config.output);
@@ -392,8 +509,7 @@ impl ServerHandler for CtxhelprServer {
                  Workflow: get_overview -> drill with search_symbols/get_file_symbols/\
                  get_symbol_detail/get_references/get_dependencies. \
                  The index is kept fresh automatically via background file watching -- no manual \
-                 update calls needed. \
-                 The index only includes git-tracked files (.gitignore is respected). \
+                 update calls needed. The index only includes git-tracked files (.gitignore is respected). \
                  For gitignored files, use Grep/Glob/Read. \
                  Use Grep/Glob only for non-code searches (config files, text patterns, log messages). \
                  Output keys: n=name k=kind f=file l=lines id=symbol_id sig=signature doc=doc_comment p=path"

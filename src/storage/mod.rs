@@ -146,6 +146,10 @@ pub fn db_path_for_repo(repo_path: &str) -> PathBuf {
         .join(format!("{}.db", short_hash))
 }
 
+pub fn has_index_db(repo_path: &str) -> bool {
+    db_path_for_repo(repo_path).exists()
+}
+
 fn cache_dir() -> PathBuf {
     let dir = dirs::cache_dir().unwrap_or_else(|| PathBuf::from("/tmp"));
     dir.join("ctxhelpr")
@@ -390,6 +394,16 @@ impl SqliteStorage {
             )
             .map(|count| count > 0)
             .unwrap_or(false)
+    }
+
+    pub fn is_repo_indexed(&self, repo_path: &str) -> bool {
+        self.conn
+            .query_row(
+                "SELECT 1 FROM repositories WHERE abs_path = ?1",
+                params![repo_path],
+                |_| Ok(()),
+            )
+            .is_ok()
     }
 
     // ── Transaction control ──

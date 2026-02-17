@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use ctxhelpr::indexer::Indexer;
-use ctxhelpr::storage::SqliteStorage;
+use ctxhelpr::storage::{self, SqliteStorage};
 
 fn empty_dir() -> tempfile::TempDir {
     tempfile::tempdir().expect("Failed to create temp dir")
@@ -1591,6 +1591,43 @@ fn test_dotted_name_resolves_this_only() {
     assert!(
         !resolved_deps.is_empty(),
         "'this.findAll' should resolve to findAll symbol"
+    );
+}
+
+// ==================== Auto-Index Helper Tests ====================
+
+#[test]
+fn test_has_index_db_nonexistent() {
+    assert!(
+        !storage::has_index_db("/nonexistent/repo/path/abc123"),
+        "has_index_db should return false for non-existent repo"
+    );
+}
+
+#[test]
+fn test_is_repo_indexed_empty_db() {
+    let storage = SqliteStorage::open_memory().expect("Failed to create in-memory DB");
+    assert!(
+        !storage.is_repo_indexed("/some/path"),
+        "is_repo_indexed should return false for empty DB"
+    );
+}
+
+#[test]
+fn test_is_repo_indexed_after_indexing() {
+    let (storage, path_str) = index_fixtures();
+    assert!(
+        storage.is_repo_indexed(&path_str),
+        "is_repo_indexed should return true after indexing"
+    );
+}
+
+#[test]
+fn test_is_repo_indexed_wrong_path() {
+    let (storage, _path_str) = index_fixtures();
+    assert!(
+        !storage.is_repo_indexed("/wrong/path"),
+        "is_repo_indexed should return false for a different path"
     );
 }
 
