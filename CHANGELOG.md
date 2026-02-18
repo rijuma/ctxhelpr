@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.4 - 2026-02-18
+- Fixed first indexing issue (#40)
+
 ## 0.2.3 - 2026-02-15
 - Updated skill refresh on MCP start
 - Code cleanup and improvements
